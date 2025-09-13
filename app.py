@@ -49,151 +49,155 @@ SIMULATOR_ICON_URL = "https://cdn-icons-png.flaticon.com/512/5261/5261273.png"
 
 # Replace the existing CSS in your load_css() function with this enhanced version:
 
+# Complete solution that works with any Streamlit version:
+
+st.set_page_config(
+    page_title="SegmentIQ v6.1 | Ultimate Edition",
+    page_icon="👑",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Complete solution that works with any Streamlit version (fixed)
+
+import streamlit as st
+import streamlit.components.v1 as components
+
+# Page config MUST be first
+st.set_page_config(
+    page_title="SegmentIQ v6.1 | Ultimate Edition",
+    page_icon="👑",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 def load_css():
     st.markdown("""
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
             
-            /* CRITICAL SIDEBAR VISIBILITY FIXES */
+            /* UNIVERSAL SIDEBAR FIX - Works with all Streamlit versions */
             
-            /* Force sidebar to be visible and properly sized */
-            section[data-testid="stSidebar"] {
+            /* Target ALL possible sidebar containers */
+            section[data-testid="stSidebar"],
+            .css-1d391kg,
+            .css-1lcbmhc, 
+            .css-1outpf7,
+            .css-1y4p8pa,
+            .st-emotion-cache-1cypcdb,
+            .st-emotion-cache-6qob1r {
+                display: block !important;
+                visibility: visible !important;
+            }
+            
+            /* Target ALL possible toggle buttons */
+            button[kind="header"],
+            div[data-testid="collapsedControl"],
+            .css-1rs6os,
+            .css-1kyxreq,
+            .st-emotion-cache-1rs6os,
+            .st-emotion-cache-1kyxreq,
+            [data-testid="baseButton-header"] {
                 display: block !important;
                 visibility: visible !important;
                 opacity: 1 !important;
-                width: 21rem !important;
-                min-width: 21rem !important;
-                max-width: 21rem !important;
-                position: relative !important;
-                transform: translateX(0) !important;
-                left: 0 !important;
                 z-index: 999999 !important;
-            }
-            
-            /* Ensure sidebar content is visible */
-            section[data-testid="stSidebar"] > div {
-                display: block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                width: 100% !important;
-            }
-            
-            /* Force sidebar toggle button to be visible and functional */
-            button[kind="header"] {
-                display: block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                z-index: 1000000 !important;
-                position: fixed !important;
-                top: 1rem !important;
-                left: 1rem !important;
-                background: rgba(0, 212, 255, 0.8) !important;
-                border: 2px solid rgba(0, 212, 255, 0.6) !important;
+                background: linear-gradient(45deg, #00d4ff, #7b68ee) !important;
+                border: 2px solid rgba(0, 212, 255, 0.8) !important;
                 border-radius: 8px !important;
-                padding: 8px !important;
                 color: white !important;
+                padding: 8px !important;
                 box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4) !important;
+                cursor: pointer !important;
+                transition: all 0.3s ease !important;
+                position: relative !important;
             }
             
-            /* Alternative selector for the toggle button */
-            div[data-testid="collapsedControl"] {
-                display: block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                z-index: 1000000 !important;
+            /* Hover effects for toggle buttons */
+            button[kind="header"]:hover,
+            div[data-testid="collapsedControl"]:hover,
+            .css-1rs6os:hover,
+            .css-1kyxreq:hover,
+            .st-emotion-cache-1rs6os:hover,
+            .st-emotion-cache-1kyxreq:hover,
+            [data-testid="baseButton-header"]:hover {
+                background: linear-gradient(45deg, #00bfff, #9370db) !important;
+                border-color: rgba(0, 212, 255, 1) !important;
+                box-shadow: 0 6px 20px rgba(0, 212, 255, 0.6) !important;
+                transform: scale(1.05) !important;
             }
             
-            /* Ensure main content adjusts properly when sidebar is open */
-            .main .block-container {
-                padding-left: 1rem !important;
-                max-width: none !important;
-            }
-            
-            /* Force sidebar to stay open on mobile */
-            @media (max-width: 768px) {
-                section[data-testid="stSidebar"] {
-                    display: block !important;
-                    position: fixed !important;
-                    left: 0 !important;
-                    top: 0 !important;
-                    height: 100vh !important;
-                    z-index: 999999 !important;
-                    transform: translateX(0) !important;
-                }
-            }
-            
-            /* Override any Streamlit classes that might hide the sidebar */
-            .css-1d391kg, .css-1lcbmhc, .css-1outpf7, .css-1y4p8pa {
-                display: block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-            }
-            
-            /* Global Dark Theme */
-            .main, .stApp {
+            /* Dark theme */
+            .main, .stApp, [data-testid="stAppViewContainer"] {
                 background: #0a0a0a !important;
                 color: #ffffff !important;
-                font-family: 'Inter', sans-serif;
+                font-family: 'Inter', sans-serif !important;
             }
             
-            /* Remove Streamlit branding and margins */
+            /* Hide Streamlit branding (but DO NOT hide header itself) */
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
-            header {visibility: hidden;}
+            /* header {visibility: hidden;} <-- REMOVED to keep toggle visible */
             .stDeployButton {visibility: hidden;}
             
-            /* Main container styling */
-            .block-container {
-                padding-top: 1rem !important;
-                padding-bottom: 1rem !important;
-                background: #0a0a0a;
-            }
-            
-            /* Enhanced Sidebar Dark Theme with Better Visibility */
-            [data-testid="stSidebar"] {
+            /* Sidebar styling */
+            section[data-testid="stSidebar"] {
                 background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%) !important;
                 border-right: 3px solid rgba(0, 212, 255, 0.6) !important;
                 box-shadow: 5px 0 25px rgba(0, 212, 255, 0.3) !important;
-                backdrop-filter: blur(10px) !important;
             }
             
-            [data-testid="stSidebar"] > div:first-child {
+            section[data-testid="stSidebar"] > div {
                 background: transparent !important;
                 padding: 1rem !important;
             }
             
-            /* Enhanced sidebar text colors for better visibility */
-            [data-testid="stSidebar"] .stMarkdown {
+            /* Sidebar text styling */
+            section[data-testid="stSidebar"] .stMarkdown {
                 color: #ffffff !important;
                 font-weight: 500 !important;
             }
             
-            [data-testid="stSidebar"] label {
+            section[data-testid="stSidebar"] label {
                 color: #ffffff !important;
                 font-weight: 600 !important;
                 text-shadow: 0 0 5px rgba(0, 212, 255, 0.3) !important;
             }
             
-            /* Sidebar widget styling */
-            [data-testid="stSidebar"] .stSelectbox > div > div {
+            /* Sidebar form elements */
+            section[data-testid="stSidebar"] .stSelectbox > div > div {
                 background: rgba(0, 212, 255, 0.15) !important;
                 border: 2px solid rgba(0, 212, 255, 0.4) !important;
                 color: #ffffff !important;
+                border-radius: 8px !important;
             }
             
-            [data-testid="stSidebar"] .stFileUploader {
+            section[data-testid="stSidebar"] .stFileUploader {
                 background: rgba(0, 212, 255, 0.1) !important;
                 border: 2px dashed rgba(0, 212, 255, 0.6) !important;
                 border-radius: 10px !important;
                 padding: 1rem !important;
             }
             
-            [data-testid="stSidebar"] .stSlider {
-                padding: 1rem 0 !important;
+            section[data-testid="stSidebar"] .stButton > button {
+                background: linear-gradient(45deg, #00d4ff, #7b68ee) !important;
+                border: 2px solid rgba(0, 212, 255, 0.7) !important;
+                color: white !important;
+                font-weight: 600 !important;
+                border-radius: 20px !important;
+                padding: 12px 20px !important;
+                box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3) !important;
+                transition: all 0.3s ease !important;
+                width: 100% !important;
             }
             
-            /* Rest of your existing CSS... */
-            /* Animated background gradient */
+            section[data-testid="stSidebar"] .stButton > button:hover {
+                background: linear-gradient(45deg, #00bfff, #9370db) !important;
+                transform: translateY(-2px) !important;
+                box-shadow: 0 8px 25px rgba(0, 212, 255, 0.5) !important;
+            }
+            
+            /* Animated background */
             .main::before {
                 content: '';
                 position: fixed;
@@ -215,7 +219,7 @@ def load_css():
                 100% { transform: translateX(10px); }
             }
             
-            /* Enhanced Title Styling */
+            /* Title styling */
             .neon-title {
                 font-family: 'Inter', sans-serif;
                 font-weight: 900;
@@ -252,7 +256,7 @@ def load_css():
                 text-shadow: 0 0 15px rgba(0, 212, 255, 0.6);
             }
             
-            /* Enhanced Button Styling - FIXED VISIBILITY */
+            /* Main content buttons */
             .stButton > button {
                 color: #ffffff !important;
                 background: linear-gradient(45deg, #00d4ff, #7b68ee) !important;
@@ -261,65 +265,19 @@ def load_css():
                 padding: 15px 30px !important;
                 font-weight: 600 !important;
                 font-family: 'Inter', sans-serif !important;
-                font-size: 1rem !important;
                 transition: all 0.3s ease;
                 box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3) !important;
                 width: 100% !important;
-                margin: 8px 0 !important;
-                position: relative;
-                overflow: hidden;
                 min-height: 50px !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                text-align: center !important;
-            }
-            
-            /* Sidebar specific button styling */
-            [data-testid="stSidebar"] .stButton > button {
-                background: linear-gradient(45deg, #00d4ff, #7b68ee) !important;
-                border: 2px solid rgba(0, 212, 255, 0.7) !important;
-                box-shadow: 0 5px 20px rgba(0, 212, 255, 0.4) !important;
-                font-weight: 700 !important;
-                text-transform: uppercase !important;
-                letter-spacing: 1px !important;
-            }
-            
-            [data-testid="stSidebar"] .stButton > button:hover {
-                background: linear-gradient(45deg, #00bfff, #9370db) !important;
-                border-color: rgba(0, 212, 255, 0.9) !important;
-                box-shadow: 0 8px 30px rgba(0, 212, 255, 0.6) !important;
-                transform: translateY(-2px) !important;
-            }
-            
-            .stButton > button::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: -100%;
-                width: 100%;
-                height: 100%;
-                background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-                transition: left 0.5s ease;
-            }
-            
-            .stButton > button:hover::before {
-                left: 100%;
             }
             
             .stButton > button:hover {
                 transform: translateY(-3px) !important;
                 box-shadow: 0 15px 40px rgba(0, 212, 255, 0.5) !important;
                 background: linear-gradient(45deg, #00bfff, #9370db) !important;
-                border-color: rgba(0, 212, 255, 0.8) !important;
             }
             
-            .stButton > button:focus {
-                outline: none !important;
-                box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.3) !important;
-            }
-            
-            /* Enhanced Custom Cards - FIXED IMAGE VISIBILITY */
+            /* Custom cards */
             .custom-card {
                 background: rgba(26, 26, 46, 0.9) !important;
                 border: 2px solid rgba(0, 212, 255, 0.4);
@@ -340,21 +298,6 @@ def load_css():
                 margin-bottom: 2rem;
             }
             
-            .custom-card::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: -100%;
-                width: 100%;
-                height: 100%;
-                background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.1), transparent);
-                transition: left 0.6s ease;
-            }
-            
-            .custom-card:hover::before {
-                left: 100%;
-            }
-            
             .custom-card:hover {
                 transform: translateY(-15px);
                 border-color: rgba(0, 212, 255, 0.8);
@@ -364,7 +307,6 @@ def load_css():
                 background: rgba(26, 26, 46, 0.95) !important;
             }
             
-            /* FIXED IMAGE STYLING */
             .custom-card img {
                 width: 96px !important;
                 height: 96px !important;
@@ -389,8 +331,6 @@ def load_css():
                 margin-bottom: 1rem;
                 font-family: 'Inter', sans-serif;
                 text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
-                z-index: 2;
-                position: relative;
             }
             
             .custom-card p {
@@ -398,164 +338,9 @@ def load_css():
                 font-size: 1rem;
                 line-height: 1.6;
                 font-weight: 400;
-                z-index: 2;
-                position: relative;
             }
             
-            /* Input and Select Styling */
-            .stSelectbox > div > div {
-                background: rgba(26, 26, 46, 0.8) !important;
-                border: 2px solid rgba(0, 212, 255, 0.3) !important;
-                border-radius: 10px;
-                color: #ffffff !important;
-            }
-            
-            .stSelectbox > div > div:hover {
-                border-color: rgba(0, 212, 255, 0.6) !important;
-            }
-            
-            .stTextInput > div > div > input {
-                background: rgba(26, 26, 46, 0.8) !important;
-                border: 2px solid rgba(0, 212, 255, 0.3) !important;
-                border-radius: 10px;
-                color: #ffffff !important;
-                padding: 12px 16px;
-            }
-            
-            .stTextInput > div > div > input:focus {
-                border-color: rgba(0, 212, 255, 0.8) !important;
-                box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
-            }
-            
-            /* File Uploader Styling */
-            .stFileUploader > div {
-                background: rgba(26, 26, 46, 0.6) !important;
-                border: 3px dashed rgba(0, 212, 255, 0.5) !important;
-                border-radius: 15px;
-                padding: 2.5rem;
-                text-align: center;
-                transition: all 0.3s ease;
-            }
-            
-            .stFileUploader > div:hover {
-                border-color: rgba(0, 212, 255, 0.8) !important;
-                background: rgba(26, 26, 46, 0.8) !important;
-            }
-            
-            /* Slider Styling */
-            .stSlider > div > div {
-                background: rgba(0, 212, 255, 0.2) !important;
-            }
-            
-            .stSlider [role="slider"] {
-                background: linear-gradient(45deg, #00d4ff, #7b68ee) !important;
-                box-shadow: 0 0 15px rgba(0, 212, 255, 0.5);
-            }
-            
-            /* Enhanced Metrics */
-            [data-testid="metric-container"] {
-                background: rgba(26, 26, 46, 0.8) !important;
-                border: 2px solid rgba(0, 212, 255, 0.3);
-                border-radius: 15px;
-                padding: 1.5rem;
-                backdrop-filter: blur(10px);
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-                transition: all 0.3s ease;
-            }
-            
-            [data-testid="metric-container"]:hover {
-                border-color: rgba(0, 212, 255, 0.6);
-                transform: translateY(-5px);
-                box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
-            }
-            
-            [data-testid="metric-container"] > div {
-                color: #ffffff !important;
-                font-weight: 700;
-            }
-            
-            [data-testid="metric-container"] [data-testid="metric-value"] {
-                color: #00d4ff !important;
-                font-size: 1.8rem !important;
-                font-weight: 800 !important;
-            }
-            
-            /* Tab Styling */
-            .stTabs [data-baseweb="tab-list"] {
-                background: rgba(26, 26, 46, 0.8) !important;
-                border-radius: 15px;
-                padding: 8px;
-                border: 2px solid rgba(0, 212, 255, 0.2);
-            }
-            
-            .stTabs [data-baseweb="tab"] {
-                color: rgba(255, 255, 255, 0.7) !important;
-                border-radius: 10px;
-                padding: 12px 24px;
-                font-weight: 500;
-                transition: all 0.3s ease;
-            }
-            
-            .stTabs [aria-selected="true"] {
-                background: linear-gradient(45deg, #00d4ff, #7b68ee) !important;
-                color: #ffffff !important;
-                font-weight: 600;
-                box-shadow: 0 5px 15px rgba(0, 212, 255, 0.3);
-            }
-            
-            /* Dataframe Styling */
-            .stDataFrame {
-                background: rgba(26, 26, 46, 0.8) !important;
-                border-radius: 15px;
-                border: 2px solid rgba(0, 212, 255, 0.2);
-                overflow: hidden;
-            }
-            
-            .stDataFrame table {
-                background: transparent !important;
-                color: #ffffff !important;
-            }
-            
-            .stDataFrame th {
-                background: rgba(0, 212, 255, 0.2) !important;
-                color: #ffffff !important;
-                font-weight: 600;
-            }
-            
-            /* Expander Styling */
-            .streamlit-expanderHeader {
-                background: rgba(26, 26, 46, 0.8) !important;
-                border-radius: 10px;
-                border: 2px solid rgba(0, 212, 255, 0.3) !important;
-                color: #ffffff !important;
-                font-weight: 600;
-                transition: all 0.3s ease;
-            }
-            
-            .streamlit-expanderHeader:hover {
-                border-color: rgba(0, 212, 255, 0.6) !important;
-                background: rgba(26, 26, 46, 1) !important;
-            }
-            
-            .streamlit-expanderContent {
-                background: rgba(26, 26, 46, 0.6) !important;
-                border-radius: 0 0 10px 10px;
-                border: 2px solid rgba(0, 212, 255, 0.2);
-                border-top: none;
-            }
-            
-            /* Progress Bar */
-            .stProgress > div > div {
-                background: linear-gradient(45deg, #00d4ff, #7b68ee) !important;
-                box-shadow: 0 0 15px rgba(0, 212, 255, 0.5);
-            }
-            
-            .stProgress > div {
-                background: rgba(26, 26, 46, 0.8) !important;
-                border-radius: 10px;
-            }
-            
-            /* Subtitle Styling */
+            /* General styling */
             .subtitle {
                 text-align: center;
                 color: rgba(255, 255, 255, 0.8) !important;
@@ -565,146 +350,95 @@ def load_css():
                 text-shadow: 0 0 5px rgba(0, 212, 255, 0.3);
             }
             
-            /* Section Headers */
             h1, h2, h3, h4, h5, h6 {
                 color: #ffffff !important;
                 font-family: 'Inter', sans-serif !important;
             }
             
-            h1 {
-                text-shadow: 0 0 15px rgba(0, 212, 255, 0.5);
-            }
-            
-            h2, h3 {
-                color: #00d4ff !important;
-                text-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
-            }
-            
-            /* Alert/Warning boxes */
-            .stAlert {
-                background: rgba(26, 26, 46, 0.8) !important;
-                border: 2px solid rgba(0, 212, 255, 0.3);
-                border-radius: 15px;
-                backdrop-filter: blur(10px);
-                color: #ffffff !important;
-            }
-            
-            .stWarning {
-                border-color: rgba(255, 193, 7, 0.5) !important;
-            }
-            
-            .stSuccess {
-                border-color: rgba(40, 167, 69, 0.5) !important;
-            }
-            
-            .stError {
-                border-color: rgba(220, 53, 69, 0.5) !important;
-            }
-            
-            .stInfo {
-                border-color: rgba(23, 162, 184, 0.5) !important;
-            }
-            
-            /* Spinner */
-            .stSpinner > div {
-                border-top-color: #00d4ff !important;
-            }
-            
-            /* Text color fixes */
             p, span, div {
                 color: #ffffff;
-            }
-            
-            /* Download button styling */
-            .stDownloadButton > button {
-                background: linear-gradient(45deg, #28a745, #20c997) !important;
-                color: #ffffff !important;
-                border: 2px solid rgba(40, 167, 69, 0.5);
-                border-radius: 25px;
-                padding: 12px 24px;
-                font-weight: 600;
-                transition: all 0.3s ease;
-            }
-            
-            .stDownloadButton > button:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 10px 30px rgba(40, 167, 69, 0.3);
-            }
-            
-            /* Hide default button styling */
-            .st-emotion-cache-1r6slb0 {
-                display: none !important;
-            }
-            
-            /* Plotly chart backgrounds */
-            .js-plotly-plot {
-                background: transparent !important;
             }
         </style>
     """, unsafe_allow_html=True)
 
-# Also update the page configuration to ensure sidebar is expanded by default:
-
-st.set_page_config(
-    page_title="SegmentIQ v6.1 | Ultimate Edition",
-    page_icon="👑",
-    layout="wide",
-    initial_sidebar_state="expanded"  # This is critical
-)
-
-# Additionally, add this JavaScript snippet to force sidebar visibility:
-
-def force_sidebar_open():
-    st.markdown("""
-        <script>
-        // Force sidebar to be visible on page load
-        function ensureSidebarVisible() {
-            const sidebar = document.querySelector('[data-testid="stSidebar"]');
-            const toggleButton = document.querySelector('button[kind="header"]');
-            
-            if (sidebar) {
-                sidebar.style.display = 'block';
-                sidebar.style.visibility = 'visible';
-                sidebar.style.opacity = '1';
-                sidebar.style.transform = 'translateX(0)';
-            }
-            
-            if (toggleButton) {
-                toggleButton.style.display = 'block';
-                toggleButton.style.visibility = 'visible';
-            }
+# Enhanced force sidebar visibility with continuous monitoring (JS injected via components.html)
+def force_sidebar_visibility():
+    js = """
+    <script>
+    function ensureToggleButton() {
+        const selectors = [
+            'button[kind="header"]',
+            '[data-testid="collapsedControl"]', 
+            '[data-testid="baseButton-header"]',
+            '.css-1rs6os',
+            '.css-1kyxreq',
+            '.st-emotion-cache-1rs6os',
+            '.st-emotion-cache-1kyxreq'
+        ];
+        
+        let toggleBtn = null;
+        for (let selector of selectors) {
+            toggleBtn = document.querySelector(selector);
+            if (toggleBtn) break;
         }
         
-        // Run on page load
-        window.addEventListener('load', ensureSidebarVisible);
+        if (toggleBtn) {
+            toggleBtn.style.cssText = `
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                position: fixed !important;
+                top: 1rem !important;
+                left: 1rem !important;
+                z-index: 2147483647 !important;
+                background: linear-gradient(45deg, #00d4ff, #7b68ee) !important;
+                border: 2px solid rgba(0, 212, 255, 0.8) !important;
+                border-radius: 8px !important;
+                color: white !important;
+                padding: 10px !important;
+                box-shadow: 0 4px 15px rgba(0, 212, 255, 0.6) !important;
+                cursor: pointer !important;
+                width: 40px !important;
+                height: 40px !important;
+                min-width: 40px !important;
+                min-height: 40px !important;
+            `;
+            
+            toggleBtn.addEventListener('mouseenter', function() {
+                this.style.background = 'linear-gradient(45deg, #00bfff, #9370db)';
+                this.style.transform = 'scale(1.1)';
+                this.style.boxShadow = '0 8px 25px rgba(0, 212, 255, 0.8)';
+            });
+            
+            toggleBtn.addEventListener('mouseleave', function() {
+                this.style.background = 'linear-gradient(45deg, #00d4ff, #7b68ee)';
+                this.style.transform = 'scale(1)';
+                this.style.boxShadow = '0 4px 15px rgba(0, 212, 255, 0.6)';
+            });
+        }
         
-        // Run periodically to catch dynamic changes
-        setInterval(ensureSidebarVisible, 1000);
-        </script>
-    """, unsafe_allow_html=True)
-
-
-load_css()
-force_sidebar_open()  
-
-def create_clickable_card(title, text, image_url, page_target):
-    # Create the card HTML with enhanced styling and working images
-    card_html = f"""
-    <div class="custom-card" onclick="document.getElementById('btn-{page_target}').click()">
-        <img src="{image_url}" alt="{title}" onerror="this.style.display='none';">
-        <h3>{title}</h3>
-        <p>{text}</p>
-    </div>
+        const sidebar = document.querySelector('[data-testid="stSidebar"]');
+        if (sidebar) {
+            sidebar.style.zIndex = '999998';
+        }
+    }
+    
+    ensureToggleButton();
+    const observer = new MutationObserver(function() {
+        ensureToggleButton();
+    });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+    setInterval(ensureToggleButton, 1000);
+    window.addEventListener('load', ensureToggleButton);
+    </script>
     """
-    
-    st.markdown(card_html, unsafe_allow_html=True)
-    
-    # Hidden button for functionality - MOVED OUTSIDE OF CARD
-    if st.button(f"Go to {page_target}", key=f"btn-{page_target}", help=f"Navigate to {title}"):
-        st.session_state.page = page_target
-        st.rerun()
+    # Use components.html to ensure the script actually runs
+    components.html(js, height=0)
 
+# Apply the fixes
 load_css()
+force_sidebar_visibility()
+
 
 # --- Session State Initialization ---
 if 'page' not in st.session_state: st.session_state.page = 'home'
@@ -1318,6 +1052,8 @@ if __name__ == "__main__":
                 render_analysis_dashboard(st.session_state.results)
             elif st.session_state.page == 'simulator':
                 render_simulator_page(st.session_state.results, st.session_state.results['predictions_df'])
+
+
 
 
 
