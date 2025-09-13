@@ -35,10 +35,99 @@ SIMULATOR_ICON_URL = "https://cdn-icons-png.flaticon.com/512/5261/5261273.png"
 
 
 # --- PREMIUM UI STYLING (CSS) - NEXUS AI INSPIRED ---
+# Replace the existing CSS in your load_css() function with this enhanced version:
+
+# Replace the existing CSS in your load_css() function with this enhanced version:
+
+# Replace the existing CSS in your load_css() function with this enhanced version:
+
+# Replace your entire CSS section with this minimal approach:
+
+# Replace your entire CSS section with this minimal approach:
+
+# Complete working solution - replace your CSS function with this:
+
+# Replace the existing CSS in your load_css() function with this enhanced version:
+
 def load_css():
     st.markdown("""
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+            
+            /* CRITICAL SIDEBAR VISIBILITY FIXES */
+            
+            /* Force sidebar to be visible and properly sized */
+            section[data-testid="stSidebar"] {
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                width: 21rem !important;
+                min-width: 21rem !important;
+                max-width: 21rem !important;
+                position: relative !important;
+                transform: translateX(0) !important;
+                left: 0 !important;
+                z-index: 999999 !important;
+            }
+            
+            /* Ensure sidebar content is visible */
+            section[data-testid="stSidebar"] > div {
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                width: 100% !important;
+            }
+            
+            /* Force sidebar toggle button to be visible and functional */
+            button[kind="header"] {
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                z-index: 1000000 !important;
+                position: fixed !important;
+                top: 1rem !important;
+                left: 1rem !important;
+                background: rgba(0, 212, 255, 0.8) !important;
+                border: 2px solid rgba(0, 212, 255, 0.6) !important;
+                border-radius: 8px !important;
+                padding: 8px !important;
+                color: white !important;
+                box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4) !important;
+            }
+            
+            /* Alternative selector for the toggle button */
+            div[data-testid="collapsedControl"] {
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                z-index: 1000000 !important;
+            }
+            
+            /* Ensure main content adjusts properly when sidebar is open */
+            .main .block-container {
+                padding-left: 1rem !important;
+                max-width: none !important;
+            }
+            
+            /* Force sidebar to stay open on mobile */
+            @media (max-width: 768px) {
+                section[data-testid="stSidebar"] {
+                    display: block !important;
+                    position: fixed !important;
+                    left: 0 !important;
+                    top: 0 !important;
+                    height: 100vh !important;
+                    z-index: 999999 !important;
+                    transform: translateX(0) !important;
+                }
+            }
+            
+            /* Override any Streamlit classes that might hide the sidebar */
+            .css-1d391kg, .css-1lcbmhc, .css-1outpf7, .css-1y4p8pa {
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
             
             /* Global Dark Theme */
             .main, .stApp {
@@ -60,27 +149,50 @@ def load_css():
                 background: #0a0a0a;
             }
             
-            /* Sidebar Dark Theme */
+            /* Enhanced Sidebar Dark Theme with Better Visibility */
             [data-testid="stSidebar"] {
                 background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%) !important;
-                border-right: 2px solid rgba(0, 212, 255, 0.3);
-                box-shadow: 5px 0 20px rgba(0, 0, 0, 0.5);
+                border-right: 3px solid rgba(0, 212, 255, 0.6) !important;
+                box-shadow: 5px 0 25px rgba(0, 212, 255, 0.3) !important;
+                backdrop-filter: blur(10px) !important;
             }
             
             [data-testid="stSidebar"] > div:first-child {
-                background: transparent;
+                background: transparent !important;
+                padding: 1rem !important;
             }
             
-            /* Sidebar text colors */
+            /* Enhanced sidebar text colors for better visibility */
             [data-testid="stSidebar"] .stMarkdown {
                 color: #ffffff !important;
+                font-weight: 500 !important;
             }
             
             [data-testid="stSidebar"] label {
                 color: #ffffff !important;
-                font-weight: 500;
+                font-weight: 600 !important;
+                text-shadow: 0 0 5px rgba(0, 212, 255, 0.3) !important;
             }
             
+            /* Sidebar widget styling */
+            [data-testid="stSidebar"] .stSelectbox > div > div {
+                background: rgba(0, 212, 255, 0.15) !important;
+                border: 2px solid rgba(0, 212, 255, 0.4) !important;
+                color: #ffffff !important;
+            }
+            
+            [data-testid="stSidebar"] .stFileUploader {
+                background: rgba(0, 212, 255, 0.1) !important;
+                border: 2px dashed rgba(0, 212, 255, 0.6) !important;
+                border-radius: 10px !important;
+                padding: 1rem !important;
+            }
+            
+            [data-testid="stSidebar"] .stSlider {
+                padding: 1rem 0 !important;
+            }
+            
+            /* Rest of your existing CSS... */
             /* Animated background gradient */
             .main::before {
                 content: '';
@@ -137,7 +249,7 @@ def load_css():
                 -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
                 margin-bottom: 1rem;
-                text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+                text-shadow: 0 0 15px rgba(0, 212, 255, 0.6);
             }
             
             /* Enhanced Button Styling - FIXED VISIBILITY */
@@ -161,6 +273,23 @@ def load_css():
                 align-items: center !important;
                 justify-content: center !important;
                 text-align: center !important;
+            }
+            
+            /* Sidebar specific button styling */
+            [data-testid="stSidebar"] .stButton > button {
+                background: linear-gradient(45deg, #00d4ff, #7b68ee) !important;
+                border: 2px solid rgba(0, 212, 255, 0.7) !important;
+                box-shadow: 0 5px 20px rgba(0, 212, 255, 0.4) !important;
+                font-weight: 700 !important;
+                text-transform: uppercase !important;
+                letter-spacing: 1px !important;
+            }
+            
+            [data-testid="stSidebar"] .stButton > button:hover {
+                background: linear-gradient(45deg, #00bfff, #9370db) !important;
+                border-color: rgba(0, 212, 255, 0.9) !important;
+                box-shadow: 0 8px 30px rgba(0, 212, 255, 0.6) !important;
+                transform: translateY(-2px) !important;
             }
             
             .stButton > button::before {
@@ -514,6 +643,50 @@ def load_css():
         </style>
     """, unsafe_allow_html=True)
 
+# Also update the page configuration to ensure sidebar is expanded by default:
+
+st.set_page_config(
+    page_title="SegmentIQ v6.1 | Ultimate Edition",
+    page_icon="👑",
+    layout="wide",
+    initial_sidebar_state="expanded"  # This is critical
+)
+
+# Additionally, add this JavaScript snippet to force sidebar visibility:
+
+def force_sidebar_open():
+    st.markdown("""
+        <script>
+        // Force sidebar to be visible on page load
+        function ensureSidebarVisible() {
+            const sidebar = document.querySelector('[data-testid="stSidebar"]');
+            const toggleButton = document.querySelector('button[kind="header"]');
+            
+            if (sidebar) {
+                sidebar.style.display = 'block';
+                sidebar.style.visibility = 'visible';
+                sidebar.style.opacity = '1';
+                sidebar.style.transform = 'translateX(0)';
+            }
+            
+            if (toggleButton) {
+                toggleButton.style.display = 'block';
+                toggleButton.style.visibility = 'visible';
+            }
+        }
+        
+        // Run on page load
+        window.addEventListener('load', ensureSidebarVisible);
+        
+        // Run periodically to catch dynamic changes
+        setInterval(ensureSidebarVisible, 1000);
+        </script>
+    """, unsafe_allow_html=True)
+
+
+load_css()
+force_sidebar_open()  
+
 def create_clickable_card(title, text, image_url, page_target):
     # Create the card HTML with enhanced styling and working images
     card_html = f"""
@@ -603,6 +776,28 @@ def generate_personas(df):
     return personas
 
 # --- UI RENDERING FUNCTIONS ---
+st.markdown(
+    """
+    <style>
+    /* Ensure sidebar is visible */
+    section[data-testid="stSidebar"] {
+        display: block !important;
+    }
+
+    /* Ensure the toggle (arrow) is visible */
+    button[kind="header"] {
+        display: block !important;
+    }
+
+    /* Sometimes the toggle is hidden in newer versions */
+    div[data-testid="collapsedControl"] {
+        display: block !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 def render_sidebar():
     with st.sidebar:
         st.markdown('<h1 class="neon-title-sidebar">SegmentIQ v6.1</h1>', unsafe_allow_html=True)
@@ -621,7 +816,7 @@ def render_sidebar():
         
         st.markdown("---")
         
-        # ENHANCED RUN BUTTON WITH BETTER VISIBILITY
+        # ENHANCED RUN BUTTON
         st.markdown("### 🚀 Launch Analysis")
         run_button = st.button("🚀 Run Full Analysis", help="Start the complete AI analysis", type="primary", use_container_width=True)
         
@@ -1123,4 +1318,6 @@ if __name__ == "__main__":
                 render_analysis_dashboard(st.session_state.results)
             elif st.session_state.page == 'simulator':
                 render_simulator_page(st.session_state.results, st.session_state.results['predictions_df'])
+
+
 
