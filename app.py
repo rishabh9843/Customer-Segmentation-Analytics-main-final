@@ -6,19 +6,20 @@ from datetime import datetime, timedelta
 import warnings
 import base64
 
-# <<< THIS IS THE CORRECTED IMPORT SECTION
+# Machine Learning Imports
 from sklearn.preprocessing import RobustScaler
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
-from sklearn.mixture import GaussianMixture # Correctly imported from sklearn.mixture
+from sklearn.mixture import GaussianMixture
 import hdbscan
-# >>> END OF CORRECTION
 
 # Advanced ML & Visualization
 import umap.umap_ as umap
 import plotly.express as px
 import lightgbm as lgb
 
+# Suppress warnings
+warnings.filterwarnings('ignore')
 
 # --- Page Configuration & Premium Styling ---
 st.set_page_config(
@@ -28,57 +29,18 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- STABLE IMAGE URLS - Updated with working CDN links ---
+# --- STABLE IMAGE URLS ---
 EDA_ICON_URL = "https://cdn-icons-png.flaticon.com/512/1998/1998557.png"
 SEGMENT_ICON_URL = "https://cdn-icons-png.flaticon.com/512/8956/8956264.png"
 SIMULATOR_ICON_URL = "https://cdn-icons-png.flaticon.com/512/5261/5261273.png"
 
-
-# --- PREMIUM UI STYLING (CSS) - NEXUS AI INSPIRED ---
-# Replace the existing CSS in your load_css() function with this enhanced version:
-
-# Replace the existing CSS in your load_css() function with this enhanced version:
-
-# Replace the existing CSS in your load_css() function with this enhanced version:
-
-# Replace your entire CSS section with this minimal approach:
-
-# Replace your entire CSS section with this minimal approach:
-
-# Complete working solution - replace your CSS function with this:
-
-# Replace the existing CSS in your load_css() function with this enhanced version:
-
-# Complete solution that works with any Streamlit version:
-
-st.set_page_config(
-    page_title="SegmentIQ v6.1 | Ultimate Edition",
-    page_icon="👑",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# Complete solution that works with any Streamlit version (fixed)
-
-import streamlit as st
-import streamlit.components.v1 as components
-
-# Page config MUST be first
-st.set_page_config(
-    page_title="SegmentIQ v6.1 | Ultimate Edition",
-    page_icon="👑",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
+# CSS and JavaScript functions
 def load_css():
     st.markdown("""
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
             
             /* UNIVERSAL SIDEBAR FIX - Works with all Streamlit versions */
-            
-            /* Target ALL possible sidebar containers */
             section[data-testid="stSidebar"],
             .css-1d391kg,
             .css-1lcbmhc, 
@@ -134,10 +96,9 @@ def load_css():
                 font-family: 'Inter', sans-serif !important;
             }
             
-            /* Hide Streamlit branding (but DO NOT hide header itself) */
+            /* Hide Streamlit branding */
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
-            /* header {visibility: hidden;} <-- REMOVED to keep toggle visible */
             .stDeployButton {visibility: hidden;}
             
             /* Sidebar styling */
@@ -361,8 +322,8 @@ def load_css():
         </style>
     """, unsafe_allow_html=True)
 
-# Enhanced force sidebar visibility with continuous monitoring (JS injected via components.html)
 def force_sidebar_visibility():
+    import streamlit.components.v1 as components
     js = """
     <script>
     function ensureToggleButton() {
@@ -403,18 +364,6 @@ def force_sidebar_visibility():
                 min-width: 40px !important;
                 min-height: 40px !important;
             `;
-            
-            toggleBtn.addEventListener('mouseenter', function() {
-                this.style.background = 'linear-gradient(45deg, #00bfff, #9370db)';
-                this.style.transform = 'scale(1.1)';
-                this.style.boxShadow = '0 8px 25px rgba(0, 212, 255, 0.8)';
-            });
-            
-            toggleBtn.addEventListener('mouseleave', function() {
-                this.style.background = 'linear-gradient(45deg, #00d4ff, #7b68ee)';
-                this.style.transform = 'scale(1)';
-                this.style.boxShadow = '0 4px 15px rgba(0, 212, 255, 0.6)';
-            });
         }
         
         const sidebar = document.querySelector('[data-testid="stSidebar"]');
@@ -424,124 +373,252 @@ def force_sidebar_visibility():
     }
     
     ensureToggleButton();
-    const observer = new MutationObserver(function() {
-        ensureToggleButton();
-    });
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+    const observer = new MutationObserver(ensureToggleButton);
+    observer.observe(document.body, { childList: true, subtree: true });
     setInterval(ensureToggleButton, 1000);
-    window.addEventListener('load', ensureToggleButton);
     </script>
     """
-    # Use components.html to ensure the script actually runs
     components.html(js, height=0)
 
-# Apply the fixes
+# Apply styling
 load_css()
 force_sidebar_visibility()
 
-
 # --- Session State Initialization ---
-if 'page' not in st.session_state: st.session_state.page = 'home'
-if 'analysis_run' not in st.session_state: st.session_state.analysis_run = False
-if 'results' not in st.session_state: st.session_state.results = {}
+if 'page' not in st.session_state:
+    st.session_state.page = 'home'
+if 'analysis_run' not in st.session_state:
+    st.session_state.analysis_run = False
+if 'results' not in st.session_state:
+    st.session_state.results = {}
+if 'uploaded_data' not in st.session_state:
+    st.session_state.uploaded_data = None
 
-# --- All backend data processing functions (cached for performance) ---
+# --- Data Processing Functions ---
 @st.cache_data
-def load_data(uploaded_file): return pd.read_csv(uploaded_file, encoding='latin1')
+def load_data(uploaded_file):
+    try:
+        df = pd.read_csv(uploaded_file)
+        return df
+    except UnicodeDecodeError:
+        df = pd.read_csv(uploaded_file, encoding='latin1')
+        return df
+    except Exception as e:
+        st.error(f"Error loading data: {str(e)}")
+        return None
 
 @st.cache_data
 def preprocess_data(df_raw):
-    df = df_raw.dropna(subset=['CustomerID', 'InvoiceDate']).copy()
-    df['CustomerID'] = df['CustomerID'].astype(str)
-    df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce')
-    df['UnitPrice'] = pd.to_numeric(df['UnitPrice'], errors='coerce')
-    df = df[(df['Quantity'] > 0) & (df['UnitPrice'] > 0)]; df['Sales'] = df['Quantity'] * df['UnitPrice']
-    Q1, Q3 = df['Sales'].quantile(0.25), df['Sales'].quantile(0.75)
-    df = df[~((df['Sales'] < (Q1 - 1.5 * (Q3 - Q1))) | (df['Sales'] > (Q3 + 1.5 * (Q3 - Q1))))]
-    return df
+    """Clean and preprocess the raw data"""
+    try:
+        df = df_raw.copy()
+        
+        # Handle missing values
+        initial_rows = len(df)
+        df = df.dropna(subset=['CustomerID', 'InvoiceDate'])
+        
+        # Convert data types
+        df['CustomerID'] = df['CustomerID'].astype(str)
+        df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce')
+        df['UnitPrice'] = pd.to_numeric(df['UnitPrice'], errors='coerce')
+        
+        # Filter positive values
+        df = df[(df['Quantity'] > 0) & (df['UnitPrice'] > 0)]
+        
+        # Calculate sales
+        df['Sales'] = df['Quantity'] * df['UnitPrice']
+        
+        # Remove outliers using IQR method
+        Q1 = df['Sales'].quantile(0.25)
+        Q3 = df['Sales'].quantile(0.75)
+        IQR = Q3 - Q1
+        df = df[~((df['Sales'] < (Q1 - 1.5 * IQR)) | (df['Sales'] > (Q3 + 1.5 * IQR)))]
+        
+        final_rows = len(df)
+        st.info(f"Data preprocessing: {initial_rows:,} → {final_rows:,} rows ({((final_rows/initial_rows)*100):.1f}% retained)")
+        
+        return df
+    except Exception as e:
+        st.error(f"Error preprocessing data: {str(e)}")
+        return None
 
 @st.cache_data
 def engineer_features(df):
-    df['InvoiceDate'] = pd.to_datetime(df['InvoiceDate'])
-    ref_date = df['InvoiceDate'].max() + timedelta(days=1)
-    features = df.groupby('CustomerID').agg(
-        recency_days=('InvoiceDate', lambda x: (ref_date - x.max()).days),
-        frequency=('InvoiceNo', 'nunique'),
-        monetary_value=('Sales', 'sum'),
-    ).reset_index(); features.set_index('CustomerID', inplace=True)
-    return features.fillna(0)
+    """Create RFM features for clustering"""
+    try:
+        df = df.copy()
+        df['InvoiceDate'] = pd.to_datetime(df['InvoiceDate'], errors='coerce')
+        
+        # Reference date (one day after the latest transaction)
+        ref_date = df['InvoiceDate'].max() + timedelta(days=1)
+        
+        # Create RFM features
+        features = df.groupby('CustomerID').agg({
+            'InvoiceDate': lambda x: (ref_date - x.max()).days,  # Recency
+            'InvoiceNo': 'nunique',  # Frequency
+            'Sales': 'sum'  # Monetary
+        }).reset_index()
+        
+        features.columns = ['CustomerID', 'recency_days', 'frequency', 'monetary_value']
+        features.set_index('CustomerID', inplace=True)
+        
+        # Handle any remaining NaN values
+        features = features.fillna(0)
+        
+        st.success(f"Features engineered for {len(features):,} unique customers")
+        return features
+        
+    except Exception as e:
+        st.error(f"Error engineering features: {str(e)}")
+        return None
 
-@st.cache_resource
 def run_clustering(features_df, algorithm, n_clusters, min_cluster_size):
-    scaler = RobustScaler(); features_scaled = scaler.fit_transform(features_df)
-    if algorithm == 'K-Means': model = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-    elif algorithm == 'Gaussian Mixture': model = GaussianMixture(n_components=n_clusters, random_state=42)
-    else: model = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size)
-    labels = model.fit_predict(features_scaled)
-    metrics = {}
-    if len(np.unique(labels)) > 1:
-        metrics['silhouette'] = silhouette_score(features_scaled, labels)
-        metrics['calinski_harabasz'] = calinski_harabasz_score(features_scaled, labels)
-        metrics['davies_bouldin'] = davies_bouldin_score(features_scaled, labels)
-    return labels, features_scaled, metrics
+    """Run clustering algorithm on the features"""
+    try:
+        # Scale features
+        scaler = RobustScaler()
+        features_scaled = scaler.fit_transform(features_df)
+        
+        # Initialize model based on algorithm
+        if algorithm == 'K-Means':
+            model = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+        elif algorithm == 'Gaussian Mixture':
+            model = GaussianMixture(n_components=n_clusters, random_state=42)
+        else:  # HDBSCAN
+            model = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size, metric='euclidean')
+        
+        # Fit and predict
+        labels = model.fit_predict(features_scaled)
+        
+        # Calculate clustering metrics
+        metrics = {}
+        unique_labels = np.unique(labels)
+        
+        if len(unique_labels) > 1 and not (len(unique_labels) == 2 and -1 in unique_labels):
+            # Only calculate metrics if we have meaningful clusters
+            valid_mask = labels != -1 if -1 in labels else np.ones(len(labels), dtype=bool)
+            if np.sum(valid_mask) > 1:
+                metrics['silhouette'] = silhouette_score(features_scaled[valid_mask], labels[valid_mask])
+                metrics['calinski_harabasz'] = calinski_harabasz_score(features_scaled[valid_mask], labels[valid_mask])
+                metrics['davies_bouldin'] = davies_bouldin_score(features_scaled[valid_mask], labels[valid_mask])
+        
+        n_clusters_found = len(unique_labels)
+        n_noise = np.sum(labels == -1) if -1 in labels else 0
+        
+        st.success(f"Clustering complete: {n_clusters_found} clusters found, {n_noise} noise points")
+        
+        return labels, features_scaled, metrics, scaler
+        
+    except Exception as e:
+        st.error(f"Error in clustering: {str(e)}")
+        return None, None, {}, None
 
-@st.cache_resource
-def train_predictive_models(_features_df, _labels):
-    df = _features_df.copy(); df['cluster'] = _labels
-    df['is_churn'] = (df['recency_days'] > df['recency_days'].quantile(0.75)).astype(int)
-    X_churn, y_churn = df.drop(columns=['is_churn', 'cluster']), df['is_churn']
-    churn_model = lgb.LGBMClassifier(random_state=42).fit(X_churn, y_churn)
-    predictions_df = _features_df.copy(); predictions_df['cluster'] = _labels
-    predictions_df['churn_probability'] = churn_model.predict_proba(X_churn)[:, 1]
-    feature_importance = pd.DataFrame({'feature': X_churn.columns, 'importance': churn_model.feature_importances_}).sort_values('importance', ascending=False)
-    return predictions_df, churn_model, feature_importance
+def train_predictive_models(features_df, labels):
+    """Train churn prediction model"""
+    try:
+        df = features_df.copy()
+        df['cluster'] = labels
+        
+        # Define churn based on recency (customers who haven't purchased in the top 25% of days)
+        churn_threshold = df['recency_days'].quantile(0.75)
+        df['is_churn'] = (df['recency_days'] > churn_threshold).astype(int)
+        
+        # Prepare data for modeling
+        X = df[['recency_days', 'frequency', 'monetary_value']]
+        y = df['is_churn']
+        
+        # Train LightGBM model
+        model = lgb.LGBMClassifier(
+            random_state=42,
+            verbosity=-1,
+            force_col_wise=True
+        )
+        model.fit(X, y)
+        
+        # Make predictions
+        churn_proba = model.predict_proba(X)[:, 1]
+        
+        # Create results dataframe
+        predictions_df = features_df.copy()
+        predictions_df['cluster'] = labels
+        predictions_df['churn_probability'] = churn_proba
+        
+        # Feature importance
+        feature_importance = pd.DataFrame({
+            'feature': X.columns,
+            'importance': model.feature_importances_
+        }).sort_values('importance', ascending=False)
+        
+        st.success(f"Predictive model trained with {len(X):,} samples")
+        
+        return predictions_df, model, feature_importance
+        
+    except Exception as e:
+        st.error(f"Error training predictive models: {str(e)}")
+        return None, None, None
 
-@st.cache_data
-def generate_personas(df):
-    personas = {}
-    for cluster_id in sorted(df['cluster'].unique()):
-        if cluster_id == -1: continue
-        segment_data = df[df['cluster'] == cluster_id]
-        r, f, m = segment_data['recency_days'].mean(), segment_data['frequency'].mean(), segment_data['monetary_value'].mean()
-        if r < 90 and f > 10 and m > 2000: persona = "🏆 VIP Champions"
-        elif r > 180 and f < 2: persona = "💤 At-Risk / Dormant"
-        else: persona = f"🌿 Promising Segment {cluster_id}"
-        personas[cluster_id] = {'persona': persona, 'size': len(segment_data), 'avg_recency': r, 'avg_frequency': f, 'avg_monetary': m}
-    return personas
+def generate_personas(predictions_df):
+    """Generate customer personas based on clustering results"""
+    try:
+        personas = {}
+        
+        for cluster_id in sorted(predictions_df['cluster'].unique()):
+            if cluster_id == -1:  # Skip noise cluster
+                continue
+                
+            segment_data = predictions_df[predictions_df['cluster'] == cluster_id]
+            
+            # Calculate segment statistics
+            avg_recency = segment_data['recency_days'].mean()
+            avg_frequency = segment_data['frequency'].mean()
+            avg_monetary = segment_data['monetary_value'].mean()
+            segment_size = len(segment_data)
+            
+            # Assign persona based on RFM characteristics
+            if avg_recency <= 30 and avg_frequency >= 10 and avg_monetary >= 1000:
+                persona = "🏆 VIP Champions"
+            elif avg_recency <= 60 and avg_frequency >= 5:
+                persona = "💎 Loyal Customers"
+            elif avg_recency > 180:
+                persona = "💤 At-Risk/Dormant"
+            elif avg_frequency >= 8:
+                persona = "🔄 Frequent Buyers"
+            elif avg_monetary >= 500:
+                persona = "💰 Big Spenders"
+            else:
+                persona = f"🌿 Potential Segment"
+            
+            personas[cluster_id] = {
+                'persona': persona,
+                'size': segment_size,
+                'avg_recency': avg_recency,
+                'avg_frequency': avg_frequency,
+                'avg_monetary': avg_monetary
+            }
+        
+        st.success(f"Generated {len(personas)} customer personas")
+        return personas
+        
+    except Exception as e:
+        st.error(f"Error generating personas: {str(e)}")
+        return {}
 
 # --- UI RENDERING FUNCTIONS ---
-st.markdown(
-    """
-    <style>
-    /* Ensure sidebar is visible */
-    section[data-testid="stSidebar"] {
-        display: block !important;
-    }
-
-    /* Ensure the toggle (arrow) is visible */
-    button[kind="header"] {
-        display: block !important;
-    }
-
-    /* Sometimes the toggle is hidden in newer versions */
-    div[data-testid="collapsedControl"] {
-        display: block !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
 def render_sidebar():
     with st.sidebar:
         st.markdown('<h1 class="neon-title-sidebar">SegmentIQ v6.1</h1>', unsafe_allow_html=True)
         st.markdown('<p style="text-align: center; color: rgba(255,255,255,0.6); margin-bottom: 2rem;">Ultimate AI Analytics Suite</p>', unsafe_allow_html=True)
         st.markdown("---")
         
-        uploaded_file = st.file_uploader("📁 Upload Your Sales Data", type="csv", help="Upload a CSV file with your sales data")
+        # File uploader
+        uploaded_file = st.file_uploader(
+            "📁 Upload Your Sales Data", 
+            type="csv", 
+            help="Upload a CSV file with your sales data (should contain CustomerID, InvoiceDate, Quantity, UnitPrice columns)"
+        )
         
         st.markdown("### ⚙️ Configuration")
-        algorithm = st.selectbox("🤖 Algorithm", ('HDBSCAN', 'K-Means', 'Gaussian Mixture'))
+        algorithm = st.selectbox("🤖 Algorithm", ('K-Means', 'Gaussian Mixture', 'HDBSCAN'))
         
         if algorithm in ['K-Means', 'Gaussian Mixture']: 
             param = st.slider("🎯 Number of Segments (K)", 2, 15, 5, 1)
@@ -550,9 +627,14 @@ def render_sidebar():
         
         st.markdown("---")
         
-        # ENHANCED RUN BUTTON
+        # Run button
         st.markdown("### 🚀 Launch Analysis")
-        run_button = st.button("🚀 Run Full Analysis", help="Start the complete AI analysis", type="primary", use_container_width=True)
+        run_button = st.button(
+            "🚀 Run Full Analysis", 
+            help="Start the complete AI analysis", 
+            type="primary", 
+            use_container_width=True
+        )
         
         if uploaded_file:
             st.success("✅ Data file loaded successfully!")
@@ -563,30 +645,25 @@ def render_homepage():
     st.markdown('<h1 class="neon-title">SegmentIQ</h1>', unsafe_allow_html=True)
     st.markdown('<p class="subtitle">The ultimate AI-powered customer analytics platform for strategic intelligence</p>', unsafe_allow_html=True)
     
-    # Create centered layout for cards
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        with st.container():
-            st.markdown(f'<div class="custom-card"> <img src="{EDA_ICON_URL}"> <h3>Exploratory Analysis</h3> <p>Deep dive into your dataset with advanced statistical profiling and insights.</p> </div>', unsafe_allow_html=True)
-            if st.button("Go to EDA", key="eda", use_container_width=True):
-                st.session_state.page = 'eda'
-                st.rerun()
+        st.markdown(f'<div class="custom-card"><img src="{EDA_ICON_URL}"><h3>Exploratory Analysis</h3><p>Deep dive into your dataset with advanced statistical profiling and insights.</p></div>', unsafe_allow_html=True)
+        if st.button("Go to EDA", key="eda", use_container_width=True):
+            st.session_state.page = 'eda'
+            st.rerun()
 
     with col2:
-        with st.container():
-            st.markdown(f'<div class="custom-card"> <img src="{SEGMENT_ICON_URL}"> <h3>AI Segmentation</h3> <p>Discover customer personas using machine learning and behavioral analytics.</p> </div>', unsafe_allow_html=True)
-            if st.button("Go to Segmentation", key="analysis", use_container_width=True):
-                st.session_state.page = 'analysis'
-                st.rerun()
+        st.markdown(f'<div class="custom-card"><img src="{SEGMENT_ICON_URL}"><h3>AI Segmentation</h3><p>Discover customer personas using machine learning and behavioral analytics.</p></div>', unsafe_allow_html=True)
+        if st.button("Go to Segmentation", key="analysis", use_container_width=True):
+            st.session_state.page = 'analysis'
+            st.rerun()
                 
     with col3:
-        with st.container():
-            st.markdown(f'<div class="custom-card"> <img src="{SIMULATOR_ICON_URL}"> <h3>Churn Simulator</h3> <p>Predict customer behavior with interactive what-if scenario modeling.</p> </div>', unsafe_allow_html=True)
-            if st.button("Go to Simulator", key="simulator", use_container_width=True):
-                st.session_state.page = 'simulator'
-                st.rerun()
-
+        st.markdown(f'<div class="custom-card"><img src="{SIMULATOR_ICON_URL}"><h3>Churn Simulator</h3><p>Predict customer behavior with interactive what-if scenario modeling.</p></div>', unsafe_allow_html=True)
+        if st.button("Go to Simulator", key="simulator", use_container_width=True):
+            st.session_state.page = 'simulator'
+            st.rerun()
 
 def render_eda_page(df):
     st.markdown('<h1 class="neon-title">📊 Exploratory Data Analysis</h1>', unsafe_allow_html=True)
@@ -615,7 +692,7 @@ def render_eda_page(df):
     with col4:
         st.metric("📈 Avg Order Value", f"${df['Sales'].mean():.2f}")
     
-    # Visualizations - IMPROVED VISIBILITY
+    # Visualizations
     st.markdown("### 📈 Sales Distribution Analysis")
     fig = px.histogram(
         df, 
@@ -706,7 +783,6 @@ def render_analysis_dashboard(results):
                 xaxis=dict(gridcolor='rgba(255,255,255,0.2)', color='#ffffff'),
                 yaxis=dict(gridcolor='rgba(255,255,255,0.2)', color='#ffffff')
             )
-            # Increase marker size and add border for better visibility
             fig.update_traces(marker=dict(line=dict(width=2, color='rgba(255,255,255,0.8)')))
             st.plotly_chart(fig, use_container_width=True)
         
@@ -731,7 +807,6 @@ def render_analysis_dashboard(results):
                 xaxis=dict(gridcolor='rgba(255,255,255,0.2)', color='#ffffff'),
                 yaxis=dict(gridcolor='rgba(255,255,255,0.2)', color='#ffffff')
             )
-            # Increase marker size and opacity for better visibility
             fig.update_traces(marker=dict(size=8, opacity=0.8, line=dict(width=1, color='rgba(255,255,255,0.5)')))
             st.plotly_chart(fig, use_container_width=True)
         
@@ -791,7 +866,6 @@ def render_analysis_dashboard(results):
                 title="3D Customer Segment Visualization",
                 color_discrete_sequence=['#00d4ff', '#7b68ee', '#ff6b9d', '#00ff9f', '#ff9f40', '#ff4081']
             )
-            # Enhanced plot styling for dark theme with better visibility
             fig.update_layout(
                 scene=dict(
                     bgcolor='rgba(26,26,46,0.9)',
@@ -805,7 +879,6 @@ def render_analysis_dashboard(results):
                 title_font_size=16,
                 title_font_family='Inter'
             )
-            # Increase marker size and add borders for better visibility
             fig.update_traces(marker=dict(size=6, opacity=0.8, line=dict(width=1, color='rgba(255,255,255,0.5)')))
             st.plotly_chart(fig, use_container_width=True)
         
@@ -832,7 +905,7 @@ def render_analysis_dashboard(results):
         with col1:
             search_id = st.text_input("🔍 Search Customer ID", placeholder="Enter customer ID to search...")
         with col2:
-            st.markdown("<br>", unsafe_allow_html=True)  # Add spacing
+            st.markdown("<br>", unsafe_allow_html=True)
             if st.button("🔄 Reset Filter"):
                 search_id = ""
         
@@ -935,13 +1008,10 @@ def render_simulator_page(results, features_df):
             # Risk categorization
             if churn_prob < 0.3:
                 risk_level = "🟢 Low Risk"
-                risk_color = "success"
             elif churn_prob < 0.6:
                 risk_level = "🟡 Medium Risk"
-                risk_color = "warning"
             else:
                 risk_level = "🔴 High Risk"
-                risk_color = "error"
             
             st.markdown(f"**Risk Level:** {risk_level}")
         
@@ -972,25 +1042,31 @@ def render_simulator_page(results, features_df):
                 st.markdown("- Consider upselling opportunities")
                 st.markdown("- Reward loyalty with exclusive offers")
 
-# --- Main App Logic ---
-if __name__ == "__main__":
+# --- Main Application Logic ---
+def main():
     uploaded_file, algorithm, param, run_button = render_sidebar()
 
     # Handle analysis trigger
     if run_button and uploaded_file:
+        # Clear previous results and start fresh analysis
+        st.session_state.results = {}
         st.session_state.analysis_run = True
         st.session_state.page = 'analysis'
+        st.session_state.uploaded_data = uploaded_file
         st.rerun()
 
-    # Page routing with enhanced styling
+    # Page routing
     if st.session_state.page == 'home':
         render_homepage()
         
     elif st.session_state.page == 'eda':
         if uploaded_file:
             with st.spinner("🔍 Processing data..."):
-                processed_data = preprocess_data(load_data(uploaded_file))
-            render_eda_page(processed_data)
+                raw_data = load_data(uploaded_file)
+                if raw_data is not None:
+                    processed_data = preprocess_data(raw_data)
+                    if processed_data is not None:
+                        render_eda_page(processed_data)
         else:
             st.warning("⚠️ Please upload a CSV file to perform Exploratory Data Analysis.")
             if st.button("🏠 Return to Home"):
@@ -1011,41 +1087,81 @@ if __name__ == "__main__":
                     progress_bar = st.progress(0)
                     status_text = st.empty()
                     
-                    status_text.text("📊 Processing data...")
-                    progress_bar.progress(20)
-                    features_df = engineer_features(preprocess_data(load_data(uploaded_file)))
-                    
-                    status_text.text("🤖 Running clustering algorithms...")
-                    progress_bar.progress(40)
-                    n_clusters = param if algorithm in ['K-Means', 'Gaussian Mixture'] else 5
-                    min_size = param if algorithm == 'HDBSCAN' else 30
-                    labels, scaled_features, metrics = run_clustering(features_df, algorithm, n_clusters, min_size)
-                    
-                    status_text.text("🧠 Training predictive models...")
-                    progress_bar.progress(60)
-                    predictions, churn_model, feat_imp = train_predictive_models(features_df, labels)
-                    
-                    status_text.text("👑 Generating customer personas...")
-                    progress_bar.progress(80)
-                    personas = generate_personas(predictions)
-                    
-                    status_text.text("✅ Analysis complete!")
-                    progress_bar.progress(100)
-                    
-                    # Store results
-                    st.session_state.results = {
-                        'personas': personas,
-                        'labels': labels,
-                        'features_scaled': scaled_features,
-                        'predictions_df': predictions,
-                        'metrics': metrics,
-                        'churn_model': churn_model,
-                        'feature_importance': feat_imp
-                    }
-                    
-                    # Clean up progress indicators
-                    progress_bar.empty()
-                    status_text.empty()
+                    try:
+                        status_text.text("📊 Loading and processing data...")
+                        progress_bar.progress(10)
+                        
+                        raw_data = load_data(uploaded_file)
+                        if raw_data is None:
+                            st.error("Failed to load data. Please check your file format.")
+                            return
+                        
+                        processed_data = preprocess_data(raw_data)
+                        if processed_data is None:
+                            st.error("Failed to preprocess data. Please check your data columns.")
+                            return
+                        
+                        status_text.text("🔧 Engineering features...")
+                        progress_bar.progress(30)
+                        
+                        features_df = engineer_features(processed_data)
+                        if features_df is None:
+                            st.error("Failed to engineer features. Please check your data structure.")
+                            return
+                        
+                        status_text.text("🤖 Running clustering algorithms...")
+                        progress_bar.progress(50)
+                        
+                        n_clusters = param if algorithm in ['K-Means', 'Gaussian Mixture'] else 5
+                        min_size = param if algorithm == 'HDBSCAN' else 30
+                        
+                        clustering_results = run_clustering(features_df, algorithm, n_clusters, min_size)
+                        if clustering_results[0] is None:
+                            st.error("Clustering failed. Please try different parameters.")
+                            return
+                        
+                        labels, scaled_features, metrics, scaler = clustering_results
+                        
+                        status_text.text("🧠 Training predictive models...")
+                        progress_bar.progress(70)
+                        
+                        model_results = train_predictive_models(features_df, labels)
+                        if model_results[0] is None:
+                            st.error("Model training failed.")
+                            return
+                        
+                        predictions, churn_model, feat_imp = model_results
+                        
+                        status_text.text("👑 Generating customer personas...")
+                        progress_bar.progress(90)
+                        
+                        personas = generate_personas(predictions)
+                        if not personas:
+                            st.error("Failed to generate personas.")
+                            return
+                        
+                        status_text.text("✅ Analysis complete!")
+                        progress_bar.progress(100)
+                        
+                        # Store results
+                        st.session_state.results = {
+                            'personas': personas,
+                            'labels': labels,
+                            'features_scaled': scaled_features,
+                            'predictions_df': predictions,
+                            'metrics': metrics,
+                            'churn_model': churn_model,
+                            'feature_importance': feat_imp,
+                            'scaler': scaler
+                        }
+                        
+                    except Exception as e:
+                        st.error(f"Analysis failed: {str(e)}")
+                        return
+                    finally:
+                        # Clean up progress indicators
+                        progress_bar.empty()
+                        status_text.empty()
             
             # Render appropriate page
             if st.session_state.page == 'analysis':
@@ -1053,11 +1169,6 @@ if __name__ == "__main__":
             elif st.session_state.page == 'simulator':
                 render_simulator_page(st.session_state.results, st.session_state.results['predictions_df'])
 
-
-
-
-
-
-
-
-
+# Run the main application
+if __name__ == "__main__":
+    main()
