@@ -10,7 +10,7 @@
 ## 🌐 Live Website
 
 You can explore the deployed project here:  
-👉 [Customer Segmentation Analytics Suite (Live Demo)](https://your-live-demo-link.com)
+👉 [Customer Segmentation Analytics Suite (Live Demo)](https://customer-segmentation-analytics-main-final.streamlit.app/)
 
 ---
 
@@ -52,4 +52,5 @@ It combines **feature engineering, clustering, predictive analytics, and interac
 ```bash
 git clone https://github.com/YOUR_USERNAME/customer-segmentation-pipeline.git
 cd customer-segmentation-pipeline
+
 
