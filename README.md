@@ -86,7 +86,7 @@ The analysis revealed four key customer personas. Based on the data, I delivered
 ## 📈 Results and Visualizations
 
 **Customer Segmentation 3D Visualization**
-![Segmentation Plot](images/customer_segmentation_3d.png)
+![Segmentation Plot](https://github.com/rishabh9843/Customer-Segmentation-Analytics-main-final/blob/main/image.png)
 
 **Executive Dashboard**
 ![Dashboard](images/executive_dashboard.png)
@@ -103,3 +103,4 @@ The analysis revealed four key customer personas. Based on the data, I delivered
 ```bash
 git clone [https://github.com/YOUR_USERNAME/customer-segmentation-pipeline.git](https://github.com/YOUR_USERNAME/customer-segmentation-pipeline.git)
 cd customer-segmentation-pipeline
+
