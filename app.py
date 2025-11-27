@@ -278,8 +278,19 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
                 st.metric("High Churn Risk", f"{high_risk:,}")
             
             st.markdown("### 🎯 Segment Performance Matrix")
-            persona_df = pd.DataFrame.from_dict(personas, orient='index').reset_index()
-            persona_df.columns = ['cluster_id'] + list(persona_df.columns[1:])
+            
+            # Create dataframe from personas dictionary
+            persona_data = []
+            for cluster_id, data in personas.items():
+                persona_data.append({
+                    'cluster_id': cluster_id,
+                    'name': data['name'],
+                    'size': data['size'],
+                    'avg_recency': data['avg_recency'],
+                    'avg_monetary': data['avg_monetary'],
+                    'avg_frequency': data['avg_frequency']
+                })
+            persona_df = pd.DataFrame(persona_data)
             
             fig = px.scatter(
                 persona_df, 
@@ -374,8 +385,16 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
             
             with col2:
                 st.markdown("#### 📊 Segment Distribution")
-                segment_dist = pd.DataFrame.from_dict(personas, orient='index').reset_index()
-                segment_dist.columns = ['cluster_id'] + list(segment_dist.columns[1:])
+                
+                # Create dataframe from personas dictionary
+                segment_data = []
+                for cluster_id, data in personas.items():
+                    segment_data.append({
+                        'cluster_id': cluster_id,
+                        'name': data['name'],
+                        'size': data['size']
+                    })
+                segment_dist = pd.DataFrame(segment_data)
                 
                 fig = px.pie(
                     segment_dist,
