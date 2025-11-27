@@ -279,32 +279,54 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
             
             st.markdown("### 🎯 Segment Performance Matrix")
             
-            # Create dataframe from personas dictionary
-            persona_data = []
-            for cluster_id, data in personas.items():
-                persona_data.append({
-                    'cluster_id': cluster_id,
-                    'name': data['name'],
-                    'size': data['size'],
-                    'avg_recency': data['avg_recency'],
-                    'avg_monetary': data['avg_monetary'],
-                    'avg_frequency': data['avg_frequency']
-                })
-            persona_df = pd.DataFrame(persona_data)
-            
-            fig = px.scatter(
-                persona_df, 
-                x='avg_recency', 
-                y='avg_monetary', 
-                size='size',
-                color='name', 
-                hover_name='name', 
-                size_max=60,
-                labels={'avg_recency': 'Recency (days)', 'avg_monetary': 'Monetary Value ($)'},
-                title='Customer Segments: Recency vs Revenue'
-            )
-            fig.update_layout(template='plotly_dark', height=500)
-            st.plotly_chart(fig, use_container_width=True)
+            try:
+                # Create dataframe from personas dictionary
+                persona_rows = []
+                for cid, pdata in personas.items():
+                    persona_rows.append({
+                        'Segment': f"Segment {cid}",
+                        'Persona': pdata['name'],
+                        'Customers': pdata['size'],
+                        'Recency': pdata['avg_recency'],
+                        'Monetary': pdata['avg_monetary']
+                    })
+                
+                if persona_rows:
+                    df_viz = pd.DataFrame(persona_rows)
+                    
+                    fig = go.Figure()
+                    
+                    for idx, row in df_viz.iterrows():
+                        fig.add_trace(go.Scatter(
+                            x=[row['Recency']],
+                            y=[row['Monetary']],
+                            mode='markers+text',
+                            marker=dict(size=max(20, row['Customers']/5), opacity=0.7),
+                            text=row['Persona'],
+                            textposition='top center',
+                            name=row['Persona'],
+                            hovertemplate=f"<b>{row['Persona']}</b><br>" +
+                                        f"Customers: {row['Customers']}<br>" +
+                                        f"Recency: {row['Recency']:.0f} days<br>" +
+                                        f"Monetary: ${row['Monetary']:,.0f}<extra></extra>"
+                        ))
+                    
+                    fig.update_layout(
+                        title='Customer Segments: Recency vs Revenue',
+                        xaxis_title='Recency (days)',
+                        yaxis_title='Monetary Value ($)',
+                        template='plotly_dark',
+                        height=500,
+                        showlegend=True
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.warning("No segments to visualize")
+                    
+            except Exception as e:
+                st.error(f"Visualization error: {str(e)}")
+                st.write("Persona data:", personas)
         
         with tab2:
             st.markdown("### 👑 Customer Personas")
@@ -386,24 +408,27 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
             with col2:
                 st.markdown("#### 📊 Segment Distribution")
                 
-                # Create dataframe from personas dictionary
-                segment_data = []
-                for cluster_id, data in personas.items():
-                    segment_data.append({
-                        'cluster_id': cluster_id,
-                        'name': data['name'],
-                        'size': data['size']
-                    })
-                segment_dist = pd.DataFrame(segment_data)
-                
-                fig = px.pie(
-                    segment_dist,
-                    values='size',
-                    names='name',
-                    title='Customer Distribution by Segment'
-                )
-                fig.update_layout(template='plotly_dark', height=300)
-                st.plotly_chart(fig, use_container_width=True)
+                try:
+                    # Create simple lists for pie chart
+                    segment_names = [data['name'] for data in personas.values()]
+                    segment_sizes = [data['size'] for data in personas.values()]
+                    
+                    fig = go.Figure(data=[go.Pie(
+                        labels=segment_names,
+                        values=segment_sizes,
+                        hole=0.3
+                    )])
+                    
+                    fig.update_layout(
+                        title='Customer Distribution by Segment',
+                        template='plotly_dark',
+                        height=300
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                except Exception as e:
+                    st.error(f"Pie chart error: {str(e)}")
             
             # Summary
             st.markdown("### 📈 Analysis Summary")
