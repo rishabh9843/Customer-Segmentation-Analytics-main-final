@@ -37,7 +37,7 @@ st.markdown("""
 
 # Title
 st.title("📊 Customer Segmentation Analytics")
-st.markdown("**AI-powered customer insights using ensemble clustering and predictive modeling**")
+st.markdown("**Customer insights using ensemble clustering and predictive modeling**")
 st.markdown("---")
 
 # Sidebar
@@ -274,3 +274,4 @@ elif not uploaded_file:
         - **3D Visualization:** Interactive cluster exploration
         - **Actionable Insights:** Retention strategies
         """)
+
