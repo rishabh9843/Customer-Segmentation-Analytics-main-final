@@ -278,7 +278,9 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
                 st.metric("High Churn Risk", f"{high_risk:,}")
             
             st.markdown("### 🎯 Segment Performance Matrix")
-            persona_df = pd.DataFrame.from_dict(personas, orient='index')
+            persona_df = pd.DataFrame.from_dict(personas, orient='index').reset_index()
+            persona_df.columns = ['cluster_id'] + list(persona_df.columns[1:])
+            
             fig = px.scatter(
                 persona_df, 
                 x='avg_recency', 
@@ -372,7 +374,9 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
             
             with col2:
                 st.markdown("#### 📊 Segment Distribution")
-                segment_dist = pd.DataFrame.from_dict(personas, orient='index')
+                segment_dist = pd.DataFrame.from_dict(personas, orient='index').reset_index()
+                segment_dist.columns = ['cluster_id'] + list(segment_dist.columns[1:])
+                
                 fig = px.pie(
                     segment_dist,
                     values='size',
