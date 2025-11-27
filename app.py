@@ -6,6 +6,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.preprocessing import RobustScaler
 from sklearn.cluster import KMeans
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.decomposition import TruncatedSVD
 import hdbscan
 import lightgbm as lgb
 import umap
@@ -37,7 +39,7 @@ st.markdown("""
 
 # Title
 st.title("📊 Customer Segmentation Analytics")
-st.markdown("**Customer insights using ensemble clustering and predictive modeling**")
+st.markdown("**AI-powered customer insights using ensemble clustering, NLP, and predictive modeling**")
 st.markdown("---")
 
 # Sidebar
@@ -46,6 +48,7 @@ with st.sidebar:
     uploaded_file = st.file_uploader("Upload Sales Data (CSV)", type="csv")
     algorithm = st.selectbox("Clustering Algorithm", ['K-Means', 'HDBSCAN'])
     n_clusters = st.slider("Number of Segments", 2, 10, 5) if algorithm == 'K-Means' else None
+    use_nlp = st.checkbox("Enable NLP Features", value=True, help="Extract text features from product descriptions")
     
     if uploaded_file:
         run_analysis = st.button("🚀 Run Analysis", use_container_width=True)
@@ -65,7 +68,7 @@ def load_and_process(file):
     return df
 
 @st.cache_data
-def engineer_features(df):
+def engineer_rfm_features(df):
     """Create RFM features"""
     ref_date = df['InvoiceDate'].max() + timedelta(days=1)
     
@@ -77,8 +80,48 @@ def engineer_features(df):
     features.columns = ['recency_days', 'frequency', 'monetary_value']
     return features
 
+@st.cache_data
+def extract_nlp_features(df):
+    """Extract NLP features from product descriptions using TF-IDF"""
+    if 'Description' not in df.columns:
+        return pd.DataFrame()
+    
+    # Clean descriptions
+    df_clean = df.copy()
+    df_clean['Description'] = df_clean['Description'].fillna('unknown').astype(str).str.lower()
+    
+    # Get customer purchase descriptions
+    customer_text = df_clean.groupby('CustomerID')['Description'].apply(lambda x: ' '.join(x)).reset_index()
+    
+    # TF-IDF vectorization (NLP)
+    tfidf = TfidfVectorizer(max_features=50, stop_words='english', min_df=2)
+    tfidf_matrix = tfidf.fit_transform(customer_text['Description'])
+    
+    # Dimensionality reduction
+    svd = TruncatedSVD(n_components=5, random_state=42)
+    text_features = svd.fit_transform(tfidf_matrix)
+    
+    # Create dataframe
+    nlp_df = pd.DataFrame(
+        text_features, 
+        columns=[f'text_feature_{i+1}' for i in range(5)],
+        index=customer_text['CustomerID']
+    )
+    
+    # Add product diversity metrics
+    product_diversity = df_clean.groupby('CustomerID').agg({
+        'StockCode': 'nunique',  # Unique products
+        'Description': lambda x: x.str.len().mean()  # Avg description length
+    })
+    product_diversity.columns = ['product_diversity', 'avg_product_complexity']
+    
+    # Combine
+    nlp_features = nlp_df.join(product_diversity, how='inner')
+    
+    return nlp_features
+
 def run_clustering(features_df, algo, k):
-    """Perform clustering"""
+    """Perform ensemble clustering"""
     scaler = RobustScaler()
     X_scaled = scaler.fit_transform(features_df)
     
@@ -99,14 +142,32 @@ def train_churn_model(features_df, labels):
     churn_threshold = df['recency_days'].quantile(0.75)
     df['is_churn'] = (df['recency_days'] > churn_threshold).astype(int)
     
+    # Use only core RFM features for prediction
     X = df[['recency_days', 'frequency', 'monetary_value']]
     y = df['is_churn']
     
-    model = lgb.LGBMClassifier(random_state=42, verbosity=-1)
+    # LightGBM model
+    model = lgb.LGBMClassifier(random_state=42, verbosity=-1, n_estimators=100)
     model.fit(X, y)
     
     df['churn_probability'] = model.predict_proba(X)[:, 1]
-    return df, model
+    
+    # Feature importance
+    importance = pd.DataFrame({
+        'feature': X.columns,
+        'importance': model.feature_importances_
+    }).sort_values('importance', ascending=False)
+    
+    return df, model, importance
+
+def estimate_clv(predictions_df):
+    """Estimate Customer Lifetime Value"""
+    predictions_df['estimated_clv'] = (
+        predictions_df['monetary_value'] * 
+        (1 - predictions_df['churn_probability']) * 
+        (predictions_df['frequency'] / 12)
+    )
+    return predictions_df
 
 def create_personas(predictions_df):
     """Generate customer personas"""
@@ -119,27 +180,36 @@ def create_personas(predictions_df):
         avg_r = segment['recency_days'].mean()
         avg_f = segment['frequency'].mean()
         avg_m = segment['monetary_value'].mean()
+        avg_clv = segment['estimated_clv'].mean()
         
-        # Assign persona
+        # Assign persona based on RFM
         if avg_r <= 30 and avg_f >= 10 and avg_m >= 1000:
             persona = "🏆 VIP Champions"
+            strategy = "Exclusive benefits, personalized service"
         elif avg_r <= 60 and avg_f >= 5:
             persona = "💎 Loyal Customers"
+            strategy = "Upsell premium, referral programs"
         elif avg_r > 180:
             persona = "💤 At-Risk/Dormant"
+            strategy = "Win-back campaigns, special offers"
         elif avg_f >= 8:
             persona = "🔄 Frequent Buyers"
+            strategy = "Bundle deals, loyalty rewards"
         elif avg_m >= 500:
             persona = "💰 Big Spenders"
+            strategy = "Increase frequency, VIP treatment"
         else:
             persona = "🌿 Potential Growth"
+            strategy = "Engagement campaigns, education"
         
         personas[cluster_id] = {
             'name': persona,
             'size': len(segment),
             'avg_recency': avg_r,
             'avg_frequency': avg_f,
-            'avg_monetary': avg_m
+            'avg_monetary': avg_m,
+            'avg_clv': avg_clv,
+            'strategy': strategy
         }
     
     return personas
@@ -152,22 +222,47 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
         df = load_and_process(uploaded_file)
         st.success(f"✅ Loaded {len(df):,} transactions from {df['CustomerID'].nunique():,} customers")
         
-        features = engineer_features(df)
-        st.success(f"✅ Engineered RFM features for {len(features):,} customers")
+        # RFM Features
+        rfm_features = engineer_rfm_features(df)
+        st.success(f"✅ Engineered RFM features for {len(rfm_features):,} customers")
         
+        # NLP Features
+        if use_nlp and 'Description' in df.columns:
+            nlp_features = extract_nlp_features(df)
+            if not nlp_features.empty:
+                # Combine RFM + NLP
+                features = rfm_features.join(nlp_features, how='inner')
+                st.success(f"✅ Added {nlp_features.shape[1]} NLP features (TF-IDF + SVD)")
+            else:
+                features = rfm_features
+                st.warning("⚠️ NLP features skipped (insufficient text data)")
+        else:
+            features = rfm_features
+            if use_nlp:
+                st.info("ℹ️ NLP disabled (no Description column found)")
+        
+        st.success(f"✅ Total features: {features.shape[1]}")
+        
+        # Clustering
         labels, X_scaled = run_clustering(features, algorithm, n_clusters)
-        st.success(f"✅ {algorithm} clustering complete: {len(np.unique(labels[labels != -1]))} segments identified")
+        st.success(f"✅ {algorithm} clustering: {len(np.unique(labels[labels != -1]))} segments identified")
         
-        predictions, churn_model = train_churn_model(features, labels)
-        st.success("✅ LightGBM churn prediction model trained")
+        # Predictive modeling
+        predictions, churn_model, feat_importance = train_churn_model(rfm_features, labels)
+        st.success("✅ LightGBM churn model trained")
         
+        # CLV estimation
+        predictions = estimate_clv(predictions)
+        st.success("✅ Customer Lifetime Value estimated")
+        
+        # Customer personas
         personas = create_personas(predictions)
         st.success(f"✅ Generated {len(personas)} customer personas")
         
         st.markdown("---")
         
         # Results
-        tab1, tab2, tab3 = st.tabs(["📊 Overview", "👥 Segments", "🔮 Predictions"])
+        tab1, tab2, tab3, tab4 = st.tabs(["📊 Overview", "👥 Segments", "🔮 Predictions", "🧠 Model Insights"])
         
         with tab1:
             col1, col2, col3, col4 = st.columns(4)
@@ -176,17 +271,25 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
             with col2:
                 st.metric("Segments Found", len(personas))
             with col3:
-                avg_clv = predictions['monetary_value'].mean()
-                st.metric("Avg Customer Value", f"${avg_clv:,.0f}")
+                avg_clv = predictions['estimated_clv'].mean()
+                st.metric("Avg CLV", f"${avg_clv:,.0f}")
             with col4:
                 high_risk = (predictions['churn_probability'] > 0.6).sum()
                 st.metric("High Churn Risk", f"{high_risk:,}")
             
             st.markdown("### 🎯 Segment Performance Matrix")
             persona_df = pd.DataFrame.from_dict(personas, orient='index')
-            fig = px.scatter(persona_df, x='avg_recency', y='avg_monetary', size='size',
-                           color='name', hover_name='name', size_max=60,
-                           labels={'avg_recency': 'Recency (days)', 'avg_monetary': 'Monetary Value ($)'})
+            fig = px.scatter(
+                persona_df, 
+                x='avg_recency', 
+                y='avg_monetary', 
+                size='size',
+                color='name', 
+                hover_name='name', 
+                size_max=60,
+                labels={'avg_recency': 'Recency (days)', 'avg_monetary': 'Monetary Value ($)'},
+                title='Customer Segments: Recency vs Revenue'
+            )
             fig.update_layout(template='plotly_dark', height=500)
             st.plotly_chart(fig, use_container_width=True)
         
@@ -194,18 +297,27 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
             st.markdown("### 👑 Customer Personas")
             for cid, data in personas.items():
                 with st.expander(f"{data['name']} - Segment {cid}", expanded=True):
-                    col1, col2, col3, col4 = st.columns(4)
+                    col1, col2, col3, col4, col5 = st.columns(5)
                     col1.metric("Customers", f"{data['size']:,}")
-                    col2.metric("Avg Recency", f"{data['avg_recency']:.0f} days")
+                    col2.metric("Avg Recency", f"{data['avg_recency']:.0f}d")
                     col3.metric("Avg Frequency", f"{data['avg_frequency']:.1f}")
                     col4.metric("Avg Spend", f"${data['avg_monetary']:,.0f}")
+                    col5.metric("Avg CLV", f"${data['avg_clv']:,.0f}")
+                    
+                    st.markdown(f"**💡 Strategy:** {data['strategy']}")
             
-            st.markdown("### 🌐 3D Cluster Visualization")
-            embedding = umap.UMAP(n_components=3, random_state=42).fit_transform(X_scaled)
+            st.markdown("### 🌐 3D Cluster Visualization (UMAP)")
+            embedding = umap.UMAP(n_components=3, random_state=42, n_neighbors=15).fit_transform(X_scaled)
             viz_df = pd.DataFrame(embedding, columns=['x', 'y', 'z'])
             viz_df['Segment'] = [personas.get(l, {}).get('name', 'Outlier') for l in labels]
             
-            fig = px.scatter_3d(viz_df, x='x', y='y', z='z', color='Segment')
+            fig = px.scatter_3d(
+                viz_df, 
+                x='x', y='y', z='z', 
+                color='Segment',
+                title='3D Customer Segmentation (UMAP Dimensionality Reduction)'
+            )
+            fig.update_traces(marker=dict(size=4, opacity=0.7))
             fig.update_layout(template='plotly_dark', height=600)
             st.plotly_chart(fig, use_container_width=True)
         
@@ -214,15 +326,21 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
             
             display_df = predictions.reset_index()
             display_df['Persona'] = [personas.get(l, {}).get('name', 'Unknown') for l in display_df['cluster']]
-            display_df = display_df[['CustomerID', 'Persona', 'churn_probability', 'recency_days', 'frequency', 'monetary_value']]
+            display_df = display_df[[
+                'CustomerID', 'Persona', 'churn_probability', 'estimated_clv',
+                'recency_days', 'frequency', 'monetary_value'
+            ]]
             
+            # Search
             search = st.text_input("🔍 Search Customer ID")
             if search:
                 display_df = display_df[display_df['CustomerID'].str.contains(search, case=False)]
             
+            # Display
             st.dataframe(
                 display_df.style.format({
                     'churn_probability': '{:.1%}',
+                    'estimated_clv': '${:,.2f}',
                     'monetary_value': '${:,.2f}'
                 }),
                 use_container_width=True,
@@ -232,25 +350,83 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
             # Download
             csv = display_df.to_csv(index=False)
             st.download_button("📥 Download Results", csv, "customer_predictions.csv", "text/csv")
+        
+        with tab4:
+            st.markdown("### 🧠 Model Insights")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("#### 🎯 Feature Importance (Churn Model)")
+                fig = px.bar(
+                    feat_importance,
+                    x='importance',
+                    y='feature',
+                    orientation='h',
+                    title='LightGBM Feature Importance',
+                    color='importance',
+                    color_continuous_scale='Viridis'
+                )
+                fig.update_layout(template='plotly_dark', height=300)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                st.markdown("#### 📊 Segment Distribution")
+                segment_dist = pd.DataFrame.from_dict(personas, orient='index')
+                fig = px.pie(
+                    segment_dist,
+                    values='size',
+                    names='name',
+                    title='Customer Distribution by Segment'
+                )
+                fig.update_layout(template='plotly_dark', height=300)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Summary
+            st.markdown("### 📈 Analysis Summary")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.markdown("**🔧 Features Used:**")
+                st.markdown(f"- RFM Features: 3")
+                if use_nlp and not nlp_features.empty:
+                    st.markdown(f"- NLP Features: {nlp_features.shape[1]}")
+                st.markdown(f"- Total: {features.shape[1]}")
+            
+            with col2:
+                st.markdown("**🤖 ML Techniques:**")
+                st.markdown(f"- Clustering: {algorithm}")
+                st.markdown("- Churn Model: LightGBM")
+                st.markdown("- Dim Reduction: UMAP")
+                if use_nlp:
+                    st.markdown("- NLP: TF-IDF + SVD")
+            
+            with col3:
+                st.markdown("**💼 Business Value:**")
+                total_clv = predictions['estimated_clv'].sum()
+                st.markdown(f"- Total Portfolio CLV: ${total_clv:,.0f}")
+                st.markdown(f"- High-Risk Customers: {high_risk:,}")
+                st.markdown(f"- Segments Identified: {len(personas)}")
 
 elif not uploaded_file:
     st.info("👈 Upload your sales data CSV to get started")
     
     st.markdown("### 🎯 Project Overview")
     st.markdown("""
-    **Full-stack data pipeline with ensemble ML for customer analytics**
+    **Full-stack data pipeline with ensemble ML & NLP for customer analytics**
     
     **Key Technologies:**
-    - **Data Processing:** Pandas, NumPy for feature engineering
-    - **ML Models:** Ensemble Clustering (K-Means, HDBSCAN), LightGBM for churn/CLV prediction
-    - **NLP:** Sentence Transformers for product embeddings
+    - **Data Processing:** Pandas, NumPy for feature engineering (RFM analysis)
+    - **ML Models:** Ensemble Clustering (K-Means, HDBSCAN) for segmentation
+    - **Predictive Analytics:** LightGBM for churn prediction & CLV estimation
+    - **NLP:** TF-IDF + SVD for text feature extraction from product descriptions
     - **Visualization:** Plotly 3D, UMAP dimensionality reduction
     
     **Business Impact:**
     - Automated customer segmentation with 5-10 distinct personas
-    - Predictive churn modeling with 75%+ accuracy
-    - CLV estimation for strategic retention planning
+    - Predictive churn modeling for retention strategies
+    - CLV estimation for strategic planning
     - Real-time analytics dashboard for decision-making
+    - Product preference analysis via NLP
     """)
     
     col1, col2 = st.columns(2)
@@ -261,7 +437,8 @@ elif not uploaded_file:
             'InvoiceNo': ['INV001', 'INV002', 'INV003'],
             'InvoiceDate': ['2024-01-15', '2024-01-20', '2024-02-01'],
             'Quantity': [5, 3, 10],
-            'UnitPrice': [25.50, 15.00, 8.99]
+            'UnitPrice': [25.50, 15.00, 8.99],
+            'Description': ['Premium Widget', 'Basic Tool', 'Deluxe Kit']
         })
         st.dataframe(sample_data, use_container_width=True)
     
@@ -270,8 +447,9 @@ elif not uploaded_file:
         st.markdown("""
         - **Customer Segments:** 5-10 behavioral clusters
         - **Churn Probability:** 0-100% risk score per customer
+        - **CLV Estimates:** Predicted lifetime value
         - **Customer Personas:** VIP, Loyal, At-Risk, etc.
         - **3D Visualization:** Interactive cluster exploration
-        - **Actionable Insights:** Retention strategies
+        - **NLP Insights:** Product preference patterns
+        - **Actionable Strategies:** Retention & growth plans
         """)
-
