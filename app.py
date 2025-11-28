@@ -16,7 +16,7 @@ import umap
 # ==========================================
 st.set_page_config(page_title="Customer Segmentation Analytics", layout="wide", page_icon="📊")
 
-# Custom CSS for a professional look
+# Custom CSS
 st.markdown("""
 <style>
     .main {background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%); color: #ffffff;}
@@ -70,12 +70,10 @@ with st.sidebar:
 def load_and_process(file):
     """Load and clean the raw data"""
     df = pd.read_csv(file)
-    # Basic cleaning
     df = df.dropna(subset=['CustomerID', 'InvoiceDate'])
     df['CustomerID'] = df['CustomerID'].astype(str)
     df['InvoiceDate'] = pd.to_datetime(df['InvoiceDate'])
     df['Sales'] = df['Quantity'] * df['UnitPrice']
-    # Filter valid transactions
     df = df[(df['Quantity'] > 0) & (df['UnitPrice'] > 0)]
     return df
 
@@ -141,15 +139,14 @@ def run_clustering(features_df, algo, k):
     if algo == 'K-Means':
         model = KMeans(n_clusters=k, random_state=42, n_init=10)
     else:
-        # === FIX START: ADAPTIVE SETTINGS ===
+        # === FIX: ADAPTIVE SETTINGS ===
         data_size = features_df.shape[0]
         # Calculate dynamic minimum cluster size (approx 1.5% of data)
         # But clamp it: It must be at least 3, and no more than 50
         min_cluster_size = int(max(3, min(50, data_size * 0.015)))
         
-        # min_samples=1 is 'loose', allowing more points to be in clusters rather than noise
+        # min_samples=1 allows more points to be in clusters rather than noise
         model = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size, min_samples=1, metric='euclidean')
-        # === FIX END ===
     
     labels = model.fit_predict(X_scaled)
     return labels, X_scaled
@@ -160,11 +157,10 @@ def train_churn_model(features_df, labels):
     df['cluster'] = labels
     
     # Define churn (high recency = at risk)
-    # We label the top 25% most inactive users as "At Risk" (Target = 1)
     churn_threshold = df['recency_days'].quantile(0.75)
     df['is_churn'] = (df['recency_days'] > churn_threshold).astype(int)
     
-    # Use only core RFM features for prediction (to avoid overfitting on NLP)
+    # Use only core RFM features for prediction
     X = df[['recency_days', 'frequency', 'monetary_value']]
     y = df['is_churn']
     
@@ -184,21 +180,18 @@ def train_churn_model(features_df, labels):
 
 def estimate_clv(predictions_df):
     """Estimate Customer Lifetime Value (Heuristic)"""
-    # Formula: Value * RetentionProb * Frequency
     predictions_df['estimated_clv'] = (
         predictions_df['monetary_value'] * (1 - predictions_df['churn_probability']) * (predictions_df['frequency'] / 12)
     )
     return predictions_df
 
 def create_personas(predictions_df):
-    """Generate human-readable customer personas"""
+    """Generate GROUP-LEVEL customer personas (for Cluster naming)"""
     personas = {}
     unique_labels = sorted(predictions_df['cluster'].unique())
     
     for cluster_id in unique_labels:
-        # Skip noise (-1) in HDBSCAN
-        if cluster_id == -1:
-            continue
+        if cluster_id == -1: continue # Skip noise
         
         segment = predictions_df[predictions_df['cluster'] == cluster_id]
         
@@ -208,7 +201,7 @@ def create_personas(predictions_df):
         avg_m = segment['monetary_value'].mean()
         avg_clv = segment['estimated_clv'].mean()
         
-        # Rule-based Persona Naming
+        # Rule-based Persona Naming for the GROUP
         if avg_r <= 40 and avg_f >= 5 and avg_m >= 1000:
             persona = "🏆 VIP Champions"
             strategy = "Exclusive benefits, personalized service"
@@ -253,7 +246,6 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
         # --- 2. Feature Engineering ---
         rfm_features = engineer_rfm_features(df)
         
-        # NLP Features (Simplified)
         if use_nlp and 'Description' in df.columns:
             nlp_features = extract_nlp_features(df)
             if not nlp_features.empty:
@@ -268,7 +260,6 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
         # --- 3. Clustering ---
         labels, X_scaled = run_clustering(features, algorithm, n_clusters)
         
-        # Check if clustering failed (all -1)
         unique_labels = np.unique(labels)
         if len(unique_labels) == 1 and unique_labels[0] == -1:
              st.error("⚠️ Clustering found only 'Noise' (Outliers). Try switching to K-Means or adding more data.")
@@ -279,7 +270,7 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
         predictions, churn_model, feat_importance = train_churn_model(rfm_features, labels)
         predictions = estimate_clv(predictions)
         
-        # --- 5. Personas ---
+        # --- 5. Group Personas ---
         personas = create_personas(predictions)
         st.success(f"✅ Generated {len(personas)} customer personas")
         
@@ -301,7 +292,6 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
             st.markdown("### 🎯 Segment Performance Matrix")
             
             if personas:
-                # Prepare data for plotting
                 persona_rows = []
                 for cid, pdata in personas.items():
                     persona_rows.append({
@@ -319,7 +309,7 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
                     fig.add_trace(go.Scatter(
                         x=[row['Recency']], y=[row['Monetary']],
                         mode='markers+text',
-                        marker=dict(size=max(20, row['Customers']/2), opacity=0.7), # Adjusted size
+                        marker=dict(size=max(20, row['Customers']/2), opacity=0.7),
                         text=row['Persona'], textposition='top center',
                         name=row['Persona'],
                         hovertemplate=f"<b>{row['Persona']}</b><br>Size: {row['Customers']}<br>Rev: ${row['Monetary']:,.0f}"
@@ -334,9 +324,9 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
             else:
                 st.info("No segments found to visualize.")
         
-        # --- TAB 2: PERSONAS ---
+        # --- TAB 2: PERSONAS (CLUSTER VIEW) ---
         with tab2:
-            st.markdown("### 👑 Customer Personas")
+            st.markdown("### 👑 Customer Personas (Group View)")
             for cid, data in personas.items():
                 with st.expander(f"{data['name']} - Segment {cid}", expanded=True):
                     c1, c2, c3, c4 = st.columns(4)
@@ -347,7 +337,7 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
                     st.info(f"💡 Strategy: {data['strategy']}")
             
             st.markdown("### 🌐 3D Visualization")
-            if len(features) > 5: # UMAP needs a few points
+            if len(features) > 5:
                 embedding = umap.UMAP(n_components=3, random_state=42, n_neighbors=min(15, len(features)-1)).fit_transform(X_scaled)
                 viz_df = pd.DataFrame(embedding, columns=['x', 'y', 'z'])
                 viz_df['Segment'] = [personas.get(l, {}).get('name', 'Outlier') for l in labels]
@@ -357,15 +347,49 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
                 fig.update_layout(template='plotly_dark', height=600)
                 st.plotly_chart(fig, use_container_width=True)
         
-        # --- TAB 3: PREDICTIONS ---
+        # --- TAB 3: PREDICTIONS (INDIVIDUAL VIEW) ---
         with tab3:
-            st.markdown("### 🔍 Customer Details")
-            disp_df = predictions.reset_index().copy()
-            disp_df['Persona'] = [personas.get(l, {}).get('name', 'Outlier') for l in disp_df['cluster']]
+            st.markdown("### 🔍 Customer Details (Individual View)")
             
-            # Simple filters
-            disp_df = disp_df[['CustomerID', 'Persona', 'churn_probability', 'estimated_clv', 'recency_days', 'monetary_value']]
-            st.dataframe(disp_df.style.format({'churn_probability': '{:.1%}', 'estimated_clv': '${:,.2f}', 'monetary_value': '${:,.2f}'}), use_container_width=True)
+            # COPY the dataframe so we don't mess up the original
+            disp_df = predictions.reset_index().copy()
+            
+            # --- FIX: Rule-Based Logic for INDIVIDUAL Labels ---
+            def get_individual_persona(row):
+                r, f, m = row['recency_days'], row['frequency'], row['monetary_value']
+                # Strict rules for individual naming
+                if r <= 40 and f >= 5 and m >= 1000: return "🏆 VIP Champion"
+                if r > 150: return "💤 At-Risk/Dormant"
+                if m >= 500: return "💰 Big Spender"
+                if f >= 5: return "🔄 Frequent Buyer"
+                if r <= 60: return "💎 Loyal Customer"
+                return "🌿 Potential Growth"
+
+            # Apply the function row-by-row
+            disp_df['Customer Status'] = disp_df.apply(get_individual_persona, axis=1)
+            
+            # Get the Cluster Name separately
+            disp_df['Segment Group'] = [personas.get(l, {}).get('name', 'Outlier') for l in disp_df['cluster']]
+            
+            # Select clean columns
+            disp_df = disp_df[[
+                'CustomerID', 
+                'Customer Status',  # The specific label (Correct for individual)
+                'Segment Group',    # The cluster they belong to (Macro view)
+                'churn_probability', 
+                'estimated_clv', 
+                'recency_days', 
+                'monetary_value'
+            ]]
+            
+            st.dataframe(
+                disp_df.style.format({
+                    'churn_probability': '{:.1%}', 
+                    'estimated_clv': '${:,.2f}', 
+                    'monetary_value': '${:,.2f}'
+                }), 
+                use_container_width=True
+            )
             
             csv = disp_df.to_csv(index=False)
             st.download_button("📥 Download CSV", csv, "predictions.csv", "text/csv")
