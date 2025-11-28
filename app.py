@@ -6,7 +6,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.preprocessing import RobustScaler
 from sklearn.cluster import KMeans
-from collections import Counter
+from gensim.models import Word2Vec # NEW IMPORT
 import hdbscan
 import lightgbm as lgb
 import umap
@@ -40,7 +40,7 @@ st.markdown("""
 
 # Title
 st.title("📊 Customer Segmentation Analytics")
-st.markdown("**AI-powered customer insights using ensemble clustering, Keyword Analysis, and predictive modeling**")
+st.markdown("**AI-powered customer insights using Ensemble Clustering, Word2Vec Embeddings, and Predictive Modeling**")
 st.markdown("---")
 
 # ==========================================
@@ -55,7 +55,7 @@ with st.sidebar:
     # K-Means settings
     n_clusters = st.slider("Number of Segments (K)", 2, 10, 5) if algorithm == 'K-Means' else None
     
-    use_nlp = st.checkbox("Enable NLP Features", value=True, help="Extract keyword features from descriptions")
+    use_nlp = st.checkbox("Enable NLP Features", value=True, help="Extract semantic features using Word2Vec")
     
     if uploaded_file:
         run_analysis = st.button("🚀 Run Analysis", use_container_width=True)
@@ -93,7 +93,8 @@ def engineer_rfm_features(df):
 @st.cache_data
 def extract_nlp_features(df):
     """
-    Simplified NLP: Counts how often customers buy items with specific top keywords.
+    Advanced NLP: Trains a Word2Vec model to create semantic embeddings.
+    Converts product descriptions into numerical vectors based on context.
     """
     if 'Description' not in df.columns:
         return pd.DataFrame()
@@ -102,50 +103,53 @@ def extract_nlp_features(df):
     df_clean = df.copy()
     df_clean['Description'] = df_clean['Description'].fillna('').astype(str).str.lower()
     
-    # 2. Find the Top 5 most common words across the ENTIRE store
-    all_text = ' '.join(df_clean['Description'].tolist())
-    words = all_text.split()
+    # 2. Tokenize (Split sentences into lists of words)
+    customer_group = df_clean.groupby('CustomerID')['Description'].apply(lambda x: ' '.join(x))
     
-    # Filter out boring words
-    stop_words = ['of', 'the', 'in', 'and', 'set', 'a', 'white', 'red', 'blue', 'pink', 'black', 'pack', 'small', 'large', 'box']
-    interesting_words = [w for w in words if w not in stop_words and len(w) > 2]
+    # Preprocess: Remove stop words and short words
+    stop_words = ['of', 'the', 'in', 'and', 'set', 'a', 'white', 'red', 'blue', 'pink', 'black', 'pack', 'small', 'large']
     
-    if not interesting_words:
-        return pd.DataFrame()
-        
-    top_5_words = [word for word, count in Counter(interesting_words).most_common(5)]
-    
-    # 3. Score each customer based on these 5 words
-    def count_keywords(customer_descriptions):
-        full_text = ' '.join(customer_descriptions)
-        return pd.Series({f'keyword_{w}': full_text.count(w) for w in top_5_words})
+    def clean_and_tokenize(text):
+        words = text.split()
+        return [w for w in words if w not in stop_words and len(w) > 2]
 
-    # Apply counting logic
-    nlp_features = df_clean.groupby('CustomerID')['Description'].apply(count_keywords).unstack()
+    # Create a "sentence" for every customer
+    corpus = customer_group.apply(clean_and_tokenize).tolist()
     
-    # 4. Add Product Variety (Simple diversity metric)
+    # 3. Train Word2Vec Model
+    # vector_size=5: Compact feature set
+    model = Word2Vec(sentences=corpus, vector_size=5, window=5, min_count=1, workers=1, seed=42)
+    
+    # 4. Generate Customer Vectors (Average Word Embeddings)
+    def get_customer_vector(tokens):
+        valid_words = [w for w in tokens if w in model.wv]
+        if not valid_words:
+            return np.zeros(5) 
+        return np.mean(model.wv[valid_words], axis=0)
+
+    # Apply to all customers
+    vectors = customer_group.apply(lambda x: get_customer_vector(clean_and_tokenize(x)))
+    
+    # Convert to DataFrame
+    nlp_features = pd.DataFrame(vectors.tolist(), index=vectors.index)
+    nlp_features.columns = [f'nlp_dim_{i+1}' for i in range(5)]
+    
+    # 5. Add Product Variety
     nlp_features['unique_products_count'] = df_clean.groupby('CustomerID')['StockCode'].nunique()
     
     return nlp_features
 
 def run_clustering(features_df, algo, k):
-    """
-    Perform ensemble clustering.
-    FIXED: Uses adaptive cluster size for HDBSCAN to handle small datasets.
-    """
+    """Perform ensemble clustering with adaptive settings"""
     scaler = RobustScaler()
     X_scaled = scaler.fit_transform(features_df)
     
     if algo == 'K-Means':
         model = KMeans(n_clusters=k, random_state=42, n_init=10)
     else:
-        # === FIX: ADAPTIVE SETTINGS ===
+        # Adaptive settings for HDBSCAN
         data_size = features_df.shape[0]
-        # Calculate dynamic minimum cluster size (approx 1.5% of data)
-        # But clamp it: It must be at least 3, and no more than 50
         min_cluster_size = int(max(3, min(50, data_size * 0.015)))
-        
-        # min_samples=1 allows more points to be in clusters rather than noise
         model = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size, min_samples=1, metric='euclidean')
     
     labels = model.fit_predict(X_scaled)
@@ -160,7 +164,7 @@ def train_churn_model(features_df, labels):
     churn_threshold = df['recency_days'].quantile(0.75)
     df['is_churn'] = (df['recency_days'] > churn_threshold).astype(int)
     
-    # Use only core RFM features for prediction
+    # Use RFM features for prediction
     X = df[['recency_days', 'frequency', 'monetary_value']]
     y = df['is_churn']
     
@@ -170,7 +174,7 @@ def train_churn_model(features_df, labels):
     
     df['churn_probability'] = model.predict_proba(X)[:, 1]
     
-    # Feature importance extraction
+    # Feature importance
     importance = pd.DataFrame({
         'feature': X.columns,
         'importance': model.feature_importances_
@@ -186,7 +190,7 @@ def estimate_clv(predictions_df):
     return predictions_df
 
 def create_personas(predictions_df):
-    """Generate GROUP-LEVEL customer personas (for Cluster naming)"""
+    """Generate GROUP-LEVEL customer personas"""
     personas = {}
     unique_labels = sorted(predictions_df['cluster'].unique())
     
@@ -195,7 +199,6 @@ def create_personas(predictions_df):
         
         segment = predictions_df[predictions_df['cluster'] == cluster_id]
         
-        # Calculate averages for this group
         avg_r = segment['recency_days'].mean()
         avg_f = segment['frequency'].mean()
         avg_m = segment['monetary_value'].mean()
@@ -250,7 +253,7 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
             nlp_features = extract_nlp_features(df)
             if not nlp_features.empty:
                 features = rfm_features.join(nlp_features, how='inner')
-                st.success(f"✅ Added {nlp_features.shape[1]} Keyword features")
+                st.success(f"✅ Added {nlp_features.shape[1]-1} Semantic Features (Word2Vec) + Variety")
             else:
                 features = rfm_features
                 st.warning("⚠️ NLP features skipped (insufficient text data)")
@@ -342,7 +345,7 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
                 viz_df = pd.DataFrame(embedding, columns=['x', 'y', 'z'])
                 viz_df['Segment'] = [personas.get(l, {}).get('name', 'Outlier') for l in labels]
                 
-                fig = px.scatter_3d(viz_df, x='x', y='y', z='z', color='Segment', title='3D Cluster View')
+                fig = px.scatter_3d(viz_df, x='x', y='y', z='z', color='Segment', title='3D Cluster View (Semantic + Behavioral)')
                 fig.update_traces(marker=dict(size=4, opacity=0.7))
                 fig.update_layout(template='plotly_dark', height=600)
                 st.plotly_chart(fig, use_container_width=True)
@@ -351,13 +354,11 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
         with tab3:
             st.markdown("### 🔍 Customer Details (Individual View)")
             
-            # COPY the dataframe so we don't mess up the original
             disp_df = predictions.reset_index().copy()
             
-            # --- FIX: Rule-Based Logic for INDIVIDUAL Labels ---
+            # Rule-Based Logic for INDIVIDUAL Labels
             def get_individual_persona(row):
                 r, f, m = row['recency_days'], row['frequency'], row['monetary_value']
-                # Strict rules for individual naming
                 if r <= 40 and f >= 5 and m >= 1000: return "🏆 VIP Champion"
                 if r > 150: return "💤 At-Risk/Dormant"
                 if m >= 500: return "💰 Big Spender"
@@ -365,31 +366,12 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
                 if r <= 60: return "💎 Loyal Customer"
                 return "🌿 Potential Growth"
 
-            # Apply the function row-by-row
             disp_df['Customer Status'] = disp_df.apply(get_individual_persona, axis=1)
-            
-            # Get the Cluster Name separately
             disp_df['Segment Group'] = [personas.get(l, {}).get('name', 'Outlier') for l in disp_df['cluster']]
             
-            # Select clean columns
-            disp_df = disp_df[[
-                'CustomerID', 
-                'Customer Status',  # The specific label (Correct for individual)
-                'Segment Group',    # The cluster they belong to (Macro view)
-                'churn_probability', 
-                'estimated_clv', 
-                'recency_days', 
-                'monetary_value'
-            ]]
+            disp_df = disp_df[['CustomerID', 'Customer Status', 'Segment Group', 'churn_probability', 'estimated_clv', 'recency_days', 'monetary_value']]
             
-            st.dataframe(
-                disp_df.style.format({
-                    'churn_probability': '{:.1%}', 
-                    'estimated_clv': '${:,.2f}', 
-                    'monetary_value': '${:,.2f}'
-                }), 
-                use_container_width=True
-            )
+            st.dataframe(disp_df.style.format({'churn_probability': '{:.1%}', 'estimated_clv': '${:,.2f}', 'monetary_value': '${:,.2f}'}), use_container_width=True)
             
             csv = disp_df.to_csv(index=False)
             st.download_button("📥 Download CSV", csv, "predictions.csv", "text/csv")
@@ -414,5 +396,3 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
 
 elif not uploaded_file:
     st.info("👈 Please upload your sales CSV file in the sidebar to start.")
-    st.markdown("#### 🛠️ Demo Mode")
-    st.write("If you don't have data, this app expects columns: `CustomerID`, `InvoiceDate`, `InvoiceNo`, `Quantity`, `UnitPrice`, `Description`.")
