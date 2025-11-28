@@ -6,8 +6,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.preprocessing import RobustScaler
 from sklearn.cluster import KMeans
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.decomposition import TruncatedSVD
+from collections import Counter
 import hdbscan
 import lightgbm as lgb
 import umap
@@ -39,7 +38,7 @@ st.markdown("""
 
 # Title
 st.title("📊 Customer Segmentation Analytics")
-st.markdown("**AI-powered customer insights using ensemble clustering, NLP, and predictive modeling**")
+st.markdown("**AI-powered customer insights using ensemble clustering, Keyword Analysis, and predictive modeling**")
 st.markdown("---")
 
 # Sidebar
@@ -48,7 +47,7 @@ with st.sidebar:
     uploaded_file = st.file_uploader("Upload Sales Data (CSV)", type="csv")
     algorithm = st.selectbox("Clustering Algorithm", ['K-Means', 'HDBSCAN'])
     n_clusters = st.slider("Number of Segments", 2, 10, 5) if algorithm == 'K-Means' else None
-    use_nlp = st.checkbox("Enable NLP Features", value=True, help="Extract text features from product descriptions")
+    use_nlp = st.checkbox("Enable NLP Features", value=True, help="Extract keyword features from descriptions")
     
     if uploaded_file:
         run_analysis = st.button("🚀 Run Analysis", use_container_width=True)
@@ -82,41 +81,43 @@ def engineer_rfm_features(df):
 
 @st.cache_data
 def extract_nlp_features(df):
-    """Extract NLP features from product descriptions using TF-IDF"""
+    """
+    Simplified NLP: Counts how often customers buy items with specific top keywords.
+    Easier to explain than TF-IDF/SVD.
+    """
     if 'Description' not in df.columns:
         return pd.DataFrame()
     
-    # Clean descriptions
+    # 1. Clean Text
     df_clean = df.copy()
-    df_clean['Description'] = df_clean['Description'].fillna('unknown').astype(str).str.lower()
+    df_clean['Description'] = df_clean['Description'].fillna('').astype(str).str.lower()
     
-    # Get customer purchase descriptions
-    customer_text = df_clean.groupby('CustomerID')['Description'].apply(lambda x: ' '.join(x)).reset_index()
+    # 2. Find the Top 5 most common words across the ENTIRE store
+    # We combine all text, split into words, and count them
+    all_text = ' '.join(df_clean['Description'].tolist())
+    words = all_text.split()
     
-    # TF-IDF vectorization (NLP)
-    tfidf = TfidfVectorizer(max_features=50, stop_words='english', min_df=2)
-    tfidf_matrix = tfidf.fit_transform(customer_text['Description'])
+    # Filter out boring words (stop words)
+    stop_words = ['of', 'the', 'in', 'and', 'set', 'a', 'white', 'red', 'blue', 'pink', 'black', 'pack']
+    interesting_words = [w for w in words if w not in stop_words and len(w) > 2]
     
-    # Dimensionality reduction
-    svd = TruncatedSVD(n_components=5, random_state=42)
-    text_features = svd.fit_transform(tfidf_matrix)
+    # Get top 5 most frequent words (e.g., 'bag', 'box', 'glass', 'sign', 'holder')
+    if not interesting_words:
+        return pd.DataFrame() # Return empty if no words found
+        
+    top_5_words = [word for word, count in Counter(interesting_words).most_common(5)]
     
-    # Create dataframe
-    nlp_df = pd.DataFrame(
-        text_features, 
-        columns=[f'text_feature_{i+1}' for i in range(5)],
-        index=customer_text['CustomerID']
-    )
+    # 3. Score each customer based on these 5 words
+    def count_keywords(customer_descriptions):
+        full_text = ' '.join(customer_descriptions)
+        # Create a dictionary of counts for the top 5 words
+        return pd.Series({f'keyword_{w}': full_text.count(w) for w in top_5_words})
+
+    # Apply this counting logic to every customer
+    nlp_features = df_clean.groupby('CustomerID')['Description'].apply(count_keywords).unstack()
     
-    # Add product diversity metrics
-    product_diversity = df_clean.groupby('CustomerID').agg({
-        'StockCode': 'nunique',  # Unique products
-        'Description': lambda x: x.str.len().mean()  # Avg description length
-    })
-    product_diversity.columns = ['product_diversity', 'avg_product_complexity']
-    
-    # Combine
-    nlp_features = nlp_df.join(product_diversity, how='inner')
+    # 4. Add Product Variety (Simple diversity metric)
+    nlp_features['unique_products_count'] = df_clean.groupby('CustomerID')['StockCode'].nunique()
     
     return nlp_features
 
@@ -163,9 +164,7 @@ def train_churn_model(features_df, labels):
 def estimate_clv(predictions_df):
     """Estimate Customer Lifetime Value"""
     predictions_df['estimated_clv'] = (
-        predictions_df['monetary_value'] * 
-        (1 - predictions_df['churn_probability']) * 
-        (predictions_df['frequency'] / 12)
+        predictions_df['monetary_value'] * (1 - predictions_df['churn_probability']) * (predictions_df['frequency'] / 12)
     )
     return predictions_df
 
@@ -226,13 +225,13 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
         rfm_features = engineer_rfm_features(df)
         st.success(f"✅ Engineered RFM features for {len(rfm_features):,} customers")
         
-        # NLP Features
+        # NLP Features (Simplified)
         if use_nlp and 'Description' in df.columns:
             nlp_features = extract_nlp_features(df)
             if not nlp_features.empty:
                 # Combine RFM + NLP
                 features = rfm_features.join(nlp_features, how='inner')
-                st.success(f"✅ Added {nlp_features.shape[1]} NLP features (TF-IDF + SVD)")
+                st.success(f"✅ Added {nlp_features.shape[1]} Keyword features (Top Words + Variety)")
             else:
                 features = rfm_features
                 st.warning("⚠️ NLP features skipped (insufficient text data)")
@@ -306,9 +305,9 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
                             textposition='top center',
                             name=row['Persona'],
                             hovertemplate=f"<b>{row['Persona']}</b><br>" +
-                                        f"Customers: {row['Customers']}<br>" +
-                                        f"Recency: {row['Recency']:.0f} days<br>" +
-                                        f"Monetary: ${row['Monetary']:,.0f}<extra></extra>"
+                                          f"Customers: {row['Customers']}<br>" +
+                                          f"Recency: {row['Recency']:.0f} days<br>" +
+                                          f"Monetary: ${row['Monetary']:,.0f}<extra></extra>"
                         ))
                     
                     fig.update_layout(
@@ -326,7 +325,6 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
                     
             except Exception as e:
                 st.error(f"Visualization error: {str(e)}")
-                st.write("Persona data:", personas)
         
         with tab2:
             st.markdown("### 👑 Customer Personas")
@@ -437,7 +435,7 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
                 st.markdown("**🔧 Features Used:**")
                 st.markdown(f"- RFM Features: 3")
                 if use_nlp and not nlp_features.empty:
-                    st.markdown(f"- NLP Features: {nlp_features.shape[1]}")
+                    st.markdown(f"- Keyword Features: {nlp_features.shape[1]}")
                 st.markdown(f"- Total: {features.shape[1]}")
             
             with col2:
@@ -446,7 +444,7 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
                 st.markdown("- Churn Model: LightGBM")
                 st.markdown("- Dim Reduction: UMAP")
                 if use_nlp:
-                    st.markdown("- NLP: TF-IDF + SVD")
+                    st.markdown("- NLP: Keyword Frequency")
             
             with col3:
                 st.markdown("**💼 Business Value:**")
@@ -460,13 +458,13 @@ elif not uploaded_file:
     
     st.markdown("### 🎯 Project Overview")
     st.markdown("""
-    **Full-stack data pipeline with ensemble ML & NLP for customer analytics**
+    **Full-stack data pipeline with ensemble ML & Keyword Analysis for customer analytics**
     
     **Key Technologies:**
     - **Data Processing:** Pandas, NumPy for feature engineering (RFM analysis)
     - **ML Models:** Ensemble Clustering (K-Means, HDBSCAN) for segmentation
     - **Predictive Analytics:** LightGBM for churn prediction & CLV estimation
-    - **NLP:** TF-IDF + SVD for text feature extraction from product descriptions
+    - **NLP:** Keyword Frequency Analysis for product categorization
     - **Visualization:** Plotly 3D, UMAP dimensionality reduction
     
     **Business Impact:**
@@ -474,30 +472,5 @@ elif not uploaded_file:
     - Predictive churn modeling for retention strategies
     - CLV estimation for strategic planning
     - Real-time analytics dashboard for decision-making
-    - Product preference analysis via NLP
+    - Product preference analysis via Keyword Trends
     """)
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("#### 📊 Sample Input Format")
-        sample_data = pd.DataFrame({
-            'CustomerID': ['12345', '12346', '12347'],
-            'InvoiceNo': ['INV001', 'INV002', 'INV003'],
-            'InvoiceDate': ['2024-01-15', '2024-01-20', '2024-02-01'],
-            'Quantity': [5, 3, 10],
-            'UnitPrice': [25.50, 15.00, 8.99],
-            'Description': ['Premium Widget', 'Basic Tool', 'Deluxe Kit']
-        })
-        st.dataframe(sample_data, use_container_width=True)
-    
-    with col2:
-        st.markdown("#### 🎯 Expected Outputs")
-        st.markdown("""
-        - **Customer Segments:** 5-10 behavioral clusters
-        - **Churn Probability:** 0-100% risk score per customer
-        - **CLV Estimates:** Predicted lifetime value
-        - **Customer Personas:** VIP, Loyal, At-Risk, etc.
-        - **3D Visualization:** Interactive cluster exploration
-        - **NLP Insights:** Product preference patterns
-        - **Actionable Strategies:** Retention & growth plans
-        """)
