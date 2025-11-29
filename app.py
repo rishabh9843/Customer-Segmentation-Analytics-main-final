@@ -6,7 +6,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.preprocessing import RobustScaler
 from sklearn.cluster import KMeans
-from gensim.models import Word2Vec # NEW IMPORT
+from sklearn.decomposition import PCA
+from sentence_transformers import SentenceTransformer
 import hdbscan
 import lightgbm as lgb
 import umap
@@ -40,7 +41,7 @@ st.markdown("""
 
 # Title
 st.title("📊 Customer Segmentation Analytics")
-st.markdown("**AI-powered customer insights using Ensemble Clustering, Word2Vec Embeddings, and Predictive Modeling**")
+st.markdown("**AI-powered customer insights using Sentence Transformers (BERT), Ensemble Clustering, and Predictive Modeling**")
 st.markdown("---")
 
 # ==========================================
@@ -55,7 +56,7 @@ with st.sidebar:
     # K-Means settings
     n_clusters = st.slider("Number of Segments (K)", 2, 10, 5) if algorithm == 'K-Means' else None
     
-    use_nlp = st.checkbox("Enable NLP Features", value=True, help="Extract semantic features using Word2Vec")
+    use_nlp = st.checkbox("Enable NLP Features", value=True, help="Extract semantic features using Sentence Transformers")
     
     if uploaded_file:
         run_analysis = st.button("🚀 Run Analysis", use_container_width=True)
@@ -93,48 +94,37 @@ def engineer_rfm_features(df):
 @st.cache_data
 def extract_nlp_features(df):
     """
-    Advanced NLP: Trains a Word2Vec model to create semantic embeddings.
-    Converts product descriptions into numerical vectors based on context.
+    Transformer NLP: Uses a pre-trained Sentence Transformer (BERT-based)
+    to convert customer purchase history into semantic vectors.
     """
     if 'Description' not in df.columns:
         return pd.DataFrame()
     
-    # 1. Clean Text
+    # 1. Cleaning: Lowercase and handle missing
     df_clean = df.copy()
     df_clean['Description'] = df_clean['Description'].fillna('').astype(str).str.lower()
     
-    # 2. Tokenize (Split sentences into lists of words)
+    # 2. Aggregation: Create one long "story" for each customer
+    # "bag bag lunch box..."
     customer_group = df_clean.groupby('CustomerID')['Description'].apply(lambda x: ' '.join(x))
     
-    # Preprocess: Remove stop words and short words
-    stop_words = ['of', 'the', 'in', 'and', 'set', 'a', 'white', 'red', 'blue', 'pink', 'black', 'pack', 'small', 'large']
+    # 3. Load the Transformer Model (The "Brain")
+    # 'all-MiniLM-L6-v2' is the industry standard for fast/lightweight embeddings
+    model = SentenceTransformer('all-MiniLM-L6-v2')
     
-    def clean_and_tokenize(text):
-        words = text.split()
-        return [w for w in words if w not in stop_words and len(w) > 2]
-
-    # Create a "sentence" for every customer
-    corpus = customer_group.apply(clean_and_tokenize).tolist()
+    # 4. Encoding: Convert text to numbers (384 Dimensions)
+    embeddings = model.encode(customer_group.tolist())
     
-    # 3. Train Word2Vec Model
-    # vector_size=5: Compact feature set
-    model = Word2Vec(sentences=corpus, vector_size=5, window=5, min_count=1, workers=1, seed=42)
+    # 5. Dimensionality Reduction (PCA)
+    # Squash 384 dimensions down to 5 for efficient clustering
+    pca = PCA(n_components=5, random_state=42)
+    reduced_embeddings = pca.fit_transform(embeddings)
     
-    # 4. Generate Customer Vectors (Average Word Embeddings)
-    def get_customer_vector(tokens):
-        valid_words = [w for w in tokens if w in model.wv]
-        if not valid_words:
-            return np.zeros(5) 
-        return np.mean(model.wv[valid_words], axis=0)
-
-    # Apply to all customers
-    vectors = customer_group.apply(lambda x: get_customer_vector(clean_and_tokenize(x)))
-    
-    # Convert to DataFrame
-    nlp_features = pd.DataFrame(vectors.tolist(), index=vectors.index)
+    # 6. Formatting
+    nlp_features = pd.DataFrame(reduced_embeddings, index=customer_group.index)
     nlp_features.columns = [f'nlp_dim_{i+1}' for i in range(5)]
     
-    # 5. Add Product Variety
+    # Add Variety Metric
     nlp_features['unique_products_count'] = df_clean.groupby('CustomerID')['StockCode'].nunique()
     
     return nlp_features
@@ -253,7 +243,7 @@ if uploaded_file and 'run_analysis' in locals() and run_analysis:
             nlp_features = extract_nlp_features(df)
             if not nlp_features.empty:
                 features = rfm_features.join(nlp_features, how='inner')
-                st.success(f"✅ Added {nlp_features.shape[1]-1} Semantic Features (Word2Vec) + Variety")
+                st.success(f"✅ Added {nlp_features.shape[1]-1} Semantic Features (Transformer + PCA)")
             else:
                 features = rfm_features
                 st.warning("⚠️ NLP features skipped (insufficient text data)")
