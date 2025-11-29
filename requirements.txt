@@ -6,4 +6,4 @@ plotly
 hdbscan
 lightgbm
 umap-learn
-gensim
+sentence-transformers
